@@ -1,0 +1,137 @@
+/* 🔥 Neon cyberpunk styling for writeups index page 🔥 */
+
+body {
+  background: #0b0b17;
+  color: #e0e0e0;
+  font-family: 'Roboto Mono', monospace;
+  min-height: 100vh;
+}
+
+/* Header neon style */
+header {
+  background: linear-gradient(90deg, #0b0b17 0%, #1a1a2e 100%);
+  padding: 2rem 1rem;
+  text-align: center;
+  box-shadow: 0 0 20px #39ff14;
+}
+
+header h1 {
+  color: #39ff14;
+  font-size: 3rem;
+  text-shadow: 0 0 10px #39ff14, 0 0 30px #39ff14;
+}
+
+header p {
+  color: #ff6ec7;
+  font-size: 1.2rem;
+  margin-top: .5rem;
+}
+
+nav ul {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  list-style: none;
+  margin-top: 1rem;
+  padding-left: 0;
+}
+
+nav a {
+  color: #39ff14;
+  text-decoration: none;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+nav a:hover {
+  color: #ff6ec7;
+  text-shadow: 0 0 8px #ff6ec7;
+}
+
+/* Section styling */
+.writeups-list {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(5px);
+  border-left: 4px solid #39ff14;
+  border-radius: 12px;
+  max-width: 900px;
+  margin: 3rem auto;
+  padding: 2rem;
+  position: relative;
+}
+
+/* subtle scanline overlay */
+.writeups-list::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-image: repeating-linear-gradient(
+    rgba(255,255,255,0.02) 0px,
+    rgba(255,255,255,0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.writeups-list h2 {
+  color: #ff6ec7;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px #ff6ec7;
+}
+
+.writeups-list ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.writeups-list li {
+  margin: 1rem 0;
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.writeups-list li::before {
+  content: ">";
+  position: absolute;
+  left: 0;
+  color: #39ff14;
+  font-weight: bold;
+}
+
+/* Neon link style */
+.writeups-list a {
+  color: #39ff14;
+  font-weight: bold;
+  font-size: 1.3rem;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.writeups-list a:hover {
+  color: #ff6ec7;
+  text-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7;
+  letter-spacing: 1px;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 2rem 1rem;
+  background: #1a1a2e;
+  color: #777;
+  border-top: 1px solid #39ff14;
+}
+
+footer a {
+  color: #39ff14;
+}
+
+footer a:hover {
+  color: #ff6ec7;
+}

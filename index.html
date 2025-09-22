@@ -19,7 +19,7 @@
       background: #0f0f1a;
       color: #e0e0e0;
       line-height: 1.6;
-      animation: backgroundPulse 15s infinite alternate;
+      overflow-x: hidden;
     }
 
     a {
@@ -79,12 +79,8 @@
       background: rgba(255, 255, 255, 0.03);
       backdrop-filter: blur(5px);
       border-radius: 10px;
-      transition: transform 0.3s, box-shadow 0.3s;
-    }
-
-    section:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 0 15px #39ff14;
+      position: relative;
+      overflow: hidden;
     }
 
     h2 {
@@ -126,11 +122,24 @@
       100% { text-shadow: 0 0 5px #39ff14, 0 0 10px #39ff14; }
     }
 
-    @keyframes backgroundPulse {
-      0% { background-color: #0f0f1a; }
-      50% { background-color: #1a1a2e; }
-      100% { background-color: #0f0f1a; }
+    /* Terminal typing effect */
+    .terminal-text {
+      display: inline-block;
+      white-space: pre-wrap;
+      border-right: 2px solid #39ff14;
+      animation: typing 3s steps(50, end), blink 0.7s step-end infinite;
+      overflow: hidden;
     }
+
+    @keyframes typing {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+
+    @keyframes blink {
+      50% { border-color: transparent; }
+    }
+
   </style>
 </head>
 <body>
@@ -151,21 +160,21 @@
   <main>
     <section>
       <h2>Welcome</h2>
-      <p>Hi, I’m Rachel. This is my cybersecurity portfolio where I document HackTheBox writeups, cheatsheets, and tools I’ve created. Let’s hack the matrix, one byte at a time.</p>
+      <p class="terminal-text">Hi, I’m Rachel. This is my cybersecurity portfolio where I document HackTheBox writeups, cheatsheets, and tools I’ve created. Let’s hack the matrix, one byte at a time.</p>
     </section>
 
     <section>
       <h2>Latest Writeups</h2>
       <ul>
-        <li><a href="writeups/fluffy.html">HTB: Fluffy</a></li>
+        <li><a class="terminal-text" href="writeups/fluffy.html">HTB: Fluffy</a></li>
       </ul>
     </section>
 
     <section>
       <h2>Featured Tools</h2>
       <ul>
-        <li><a href="tools/tool1.html">Tool1</a></li>
-        <li><a href="tools/tool2.html">Tool2</a></li>
+        <li><a class="terminal-text" href="tools/tool1.html">Tool1</a></li>
+        <li><a class="terminal-text" href="tools/tool2.html">Tool2</a></li>
       </ul>
     </section>
   </main>
