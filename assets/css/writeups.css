@@ -136,7 +136,7 @@ footer a:hover {
   color: #ff6ec7;
 }
 
-/* Copy button styling for code blocks */
+Copy button styling for code blocks
 .code-block {
   position: relative;
   margin: 1rem 0;
@@ -157,7 +157,7 @@ footer a:hover {
   word-break: break-word;
 }
 
-/* Copy button */
+Copy button
 .copy-btn {
   position: absolute;
   right: 8px;
@@ -177,7 +177,7 @@ footer a:hover {
   color: #fff;
 }
 
-/* Optional small success label */
+Optional small success label
 .copy-label {
   position: absolute;
   right: 8px;
@@ -352,4 +352,19 @@ footer a:hover {
   background: #10b981;
   color: #0f0f1a;
   box-shadow: 0 0 10px #10b981, 0 0 20px #10b981, 0 0 30px #10b981;
+}
+
+  /* Screenshot styling */
+  img { max-width: 100%; margin: 0.5rem 0; border: 2px solid #39ff14; border-radius: 6px; }
+
+  /* Code block with copy button */
+  .code-block { position: relative; margin: 1rem 0; }
+  pre { background: #1a1a2e; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: #0f0f1a; color: #39ff14; border: 1px solid #39ff14; border-radius: 4px; cursor: pointer; padding: 0.2rem 0.5rem; font-size: 0.8rem; transition: all 0.3s; }
+  .copy-btn:hover { color: #ff6ec7; border-color: #ff6ec7; text-shadow: 0 0 6px #ff6ec7; }
+
+header .copy-btn,
+nav .copy-btn,
+footer .copy-btn {
+  display: none !important;
 }
