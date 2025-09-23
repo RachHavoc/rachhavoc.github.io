@@ -6,34 +6,14 @@
   <meta name="description" content="Cybersecurity Portfolio of Rachel Murphy" />
   <title>Rachel Murphy | Cybersecurity Portfolio</title>
   <link rel="stylesheet" href="assets/css/style.css" />
-      <script src="/assets/css/js/script.js" defer></script>
+  <script src="/assets/css/js/script.js" defer></script>
 
   <style>
     /* --- Reset & Base --- */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Roboto Mono', monospace;
-    }
-
-    body {
-      background: #0f0f1a;
-      color: #e0e0e0;
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    a {
-      color: #39ff14;
-      text-decoration: none;
-      transition: 0.3s;
-    }
-
-    a:hover {
-      color: #ff6ec7;
-      text-shadow: 0 0 8px #ff6ec7;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto Mono', monospace; }
+    body { background: #0f0f1a; color: #e0e0e0; line-height: 1.6; overflow-x: hidden; }
+    a { text-decoration: none; transition: 0.3s; }
+    a:hover { text-shadow: 0 0 8px #ff6ec7; color: #ff6ec7; }
 
     header {
       text-align: center;
@@ -41,109 +21,49 @@
       background: linear-gradient(90deg, #0f0f1a 0%, #1a1a2e 100%);
       box-shadow: 0 0 20px #39ff14;
     }
-
     header h1 {
       font-size: 3rem;
       color: #39ff14;
       text-shadow: 0 0 10px #39ff14;
       animation: glowText 2s infinite alternate;
     }
+    header p { color: #ff6ec7; font-size: 1.2rem; margin-bottom: 1rem; }
 
-    header p {
-      color: #ff6ec7;
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
-    }
-
-    nav ul {
-      display: flex;
-      justify-content: center;
-      list-style: none;
-      gap: 2rem;
-    }
-
+    /* --- Navbar --- */
+    nav ul { display: flex; justify-content: center; list-style: none; gap: 2rem; }
     nav ul li a {
       font-weight: bold;
       letter-spacing: 1px;
       text-transform: uppercase;
-    }
-
-    main {
-      max-width: 900px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-    }
-
-    section {
-      margin-bottom: 3rem;
-      padding: 1.5rem;
-      border-left: 4px solid #39ff14;
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(5px);
-      border-radius: 10px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    h2 {
-      color: #ff6ec7;
-      margin-bottom: 1rem;
-      position: relative;
-    }
-
-    h2::after {
-      content: '';
-      display: block;
-      width: 50px;
-      height: 3px;
-      background: #39ff14;
-      margin-top: 5px;
-      border-radius: 2px;
-    }
-
-    ul li {
-      margin: 0.5rem 0;
-    }
-
-    footer {
-      text-align: center;
-      padding: 2rem 1rem;
-      background: #1a1a2e;
-      color: #777;
-      border-top: 1px solid #39ff14;
-    }
-
-    footer a {
       color: #39ff14;
+      transition: all 0.3s ease;
+      position: relative;
     }
+    nav ul li a:hover { color: #ff6ec7; text-shadow: 0 0 8px #ff6ec7, 0 0 20px #ff6ec7; }
+    .tools-placeholder { animation: pulseEmoji 1.5s infinite alternate; }
+
+    /* --- Main sections --- */
+    main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    section { margin-bottom: 3rem; padding: 1.5rem; border-left: 4px solid #39ff14; background: rgba(255,255,255,0.03); backdrop-filter: blur(5px); border-radius: 10px; position: relative; overflow: hidden; }
+    h2 { color: #ff6ec7; margin-bottom: 1rem; position: relative; }
+    h2::after { content: ''; display: block; width: 50px; height: 3px; background: #39ff14; margin-top: 5px; border-radius: 2px; }
+
+    ul li { margin: 0.5rem 0; }
+    .terminal-text { display: inline-block; white-space: pre-wrap; border-right: 2px solid #39ff14; animation: typing 3s steps(50,end), blink 0.7s step-end infinite; overflow: hidden; }
+
+    /* --- Footer --- */
+    footer { text-align: center; padding: 2rem 1rem; background: #1a1a2e; color: #777; border-top: 1px solid #39ff14; }
+    footer a { color: #39ff14; }
+    footer a:hover { color: #ff6ec7; }
 
     /* --- Animations --- */
-    @keyframes glowText {
-      0% { text-shadow: 0 0 5px #39ff14, 0 0 10px #39ff14; }
-      50% { text-shadow: 0 0 20px #ff6ec7, 0 0 30px #ff6ec7; }
-      100% { text-shadow: 0 0 5px #39ff14, 0 0 10px #39ff14; }
-    }
-
-    /* Terminal typing effect */
-    .terminal-text {
-      display: inline-block;
-      white-space: pre-wrap;
-      border-right: 2px solid #39ff14;
-      animation: typing 3s steps(50, end), blink 0.7s step-end infinite;
-      overflow: hidden;
-    }
-
-    @keyframes typing {
-      from { width: 0; }
-      to { width: 100%; }
-    }
-
-    @keyframes blink {
-      50% { border-color: transparent; }
-    }
-
+    @keyframes glowText { 0% { text-shadow: 0 0 5px #39ff14; } 50% { text-shadow: 0 0 20px #ff6ec7; } 100% { text-shadow: 0 0 5px #39ff14; } }
+    @keyframes typing { from { width: 0; } to { width: 100%; } }
+    @keyframes blink { 50% { border-color: transparent; } }
+    @keyframes pulseEmoji { 0% { transform: scale(1); } 50% { transform: scale(1.2) rotate(-5deg); } 100% { transform: scale(1); } }
   </style>
 </head>
+
 <body>
   <header>
     <h1>Rachel Murphy</h1>
@@ -153,7 +73,7 @@
         <li><a href="index.html">Home</a></li>
         <li><a href="writeups/index.html">Writeups</a></li>
         <li><a href="cheatsheets/cheatsheet.html">Cheatsheets</a></li>
-        <li><a href="tools/index.html">Tools</a></li>
+        <li><a href="#" class="tools-placeholder" title="Coming soon!">Tools 🛠️ (Under Construction)</a></li>
         <li><a href="about.html">About</a></li>
       </ul>
     </nav>
@@ -169,20 +89,21 @@
       <h2>Latest Writeups</h2>
       <ul>
         <li><a class="terminal-text" href="writeups/fluffy/fluffy.html">HTB: Fluffy</a></li>
+        <li><a class="terminal-text" href="writeups/access/access.html">PG: Access</a></li>
+
       </ul>
     </section>
 
-    <section>
-      <h2>Featured Tools</h2>
-      <ul>
-        <li><a class="terminal-text" href="tools/tool1.html">Tool1</a></li>
-        <li><a class="terminal-text" href="tools/tool2.html">Tool2</a></li>
-      </ul>
-    </section>
+<section>
+  <h2>Featured Tools</h2>
+  <ul>
+    <li><a class="terminal-text" href="#" class="tools-placeholder" title="Coming soon!">Tool1 🛠️ (Under Construction)</a></li>
+  </ul>
+</section>
   </main>
 
   <footer>
-    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a> | <a href="https://www.linkedin.com/in/rachelcmurphy/" target="_blank" rel="noopener">LinkedIn</a></p>
   </footer>
 </body>
 </html>

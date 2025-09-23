@@ -314,3 +314,42 @@ footer a:hover {
   transform: translateY(-2px);
 }
 
+.tools-placeholder {
+  color: #39ff14;
+  text-shadow: 0 0 6px #39ff14;
+  animation: pulseEmoji 1.5s infinite alternate;
+}
+
+@keyframes pulseEmoji {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1) rotate(-3deg); }
+  100% { transform: scale(1); }
+}
+
+/* Copy button */
+.copy-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background: rgba(255,255,255,0.06);
+  color: #39ff14; /* neon green */
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 0 5px #39ff14, 0 0 15px #39ff14, 0 0 20px #39ff14;
+  transition: all 0.3s ease;
+}
+.copy-btn:hover {
+  color: #ff6ec7; /* neon pink on hover */
+  box-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7, 0 0 30px #ff6ec7;
+}
+.copy-btn:focus { outline: 2px solid #60a5fa; }
+
+.copy-btn.copied {
+  background: #10b981;
+  color: #0f0f1a;
+  box-shadow: 0 0 10px #10b981, 0 0 20px #10b981, 0 0 30px #10b981;
+}
