@@ -1,48 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Tools by Rachel Murphy" />
-  <title>Tools | Rachel Murphy</title>
-
-  <!-- Base site styling -->
-  <link rel="stylesheet" href="/assets/css/writeups.css">
-      <script src="/assets/css/js/script.js" defer></script>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Cybersecurity Tools by Rachel Murphy">
+<title>Tools | Rachel Murphy Portfolio</title>
+<link rel="stylesheet" href="/assets/css/writeups.css">
+<style>
+  .repo-link { color: #39ff14; transition: all 0.3s; }
+  .repo-link:hover { color: #ff6ec7; text-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7; }
+  .tool-section { margin-bottom: 3rem; padding: 1rem; border-left: 4px solid #39ff14; background: rgba(255,255,255,0.03); border-radius: 10px; }
+  .tool-section h2 { margin-bottom: 1rem; color: #ff6ec7; }
+  .tool-form { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .tool-form input, .tool-form textarea, .tool-form button { padding: 0.5rem; border-radius: 6px; border: 1px solid #39ff14; background: #0b0b17; color: #e0e0e0; font-family: 'Roboto Mono', monospace; }
+  .tool-form button { cursor: pointer; background: #39ff14; color: #0f0f1a; transition: all 0.3s; }
+  .tool-form button:hover { background: #ff6ec7; color: #0f0f1a; }
+  .tool-output { margin-top: 1rem; padding: 1rem; background: #1a1a2e; border-radius: 6px; max-height: 300px; overflow-y: auto; font-family: 'Roboto Mono', monospace; white-space: pre-wrap; }
+</style>
 </head>
-<body>
+<body class="tools-page">
+
+  <!-- Navigation Bar -->
+  <nav class="cheatsheet-navbar">
+    <div class="nav-left">
+      <a href="../index.html" class="nav-logo">Portfolio</a>
+    </div>
+    <ul class="nav-right">
+      <li><a href="../writeups/">Writeups</a></li>
+      <li><a href="../cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+      <li><a href="index.html" class="active">Tools</a></li>
+    </ul>
+  </nav>
 
   <!-- Header -->
-  <header>
-    <h1>Tools</h1>
-    <nav>
-      <ul>
-        <li><a href="/index.html">Home</a></li>
-        <li><a href="../index.html">Writeups</a></li>
-        <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
-        <li><a href="/tools/index.html" class="active">Tools</a></li>
-        <li><a href="/about.html">About</a></li>
-      </ul>
-    </nav>
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Tools</h1>
+      <p>Python & Security Utilities</p>
+    </div>
   </header>
 
-  <main>
+<main class="tools-content">
 
-<section>
-  <p><h2>Coming Soon</h2></p>
+  <!-- Username Generator Section -->
+  <section class="tool-section">
+    <h2>Username & Email Generator 🔐</h2>
+    <p>Generate realistic corporate-style usernames and email addresses from a list of names.</p>
+
+    <form class="tool-form" id="username-generator-form">
+      <label>Enter names (First Last, one per line):</label>
+      <textarea id="names-input" rows="5" placeholder="Jane Doe&#10;John Smith"></textarea>
+      <label>Domain (optional):</label>
+      <input type="text" id="domain-input" placeholder="example.com">
+      <label><input type="checkbox" id="leet-check"> Enable leet-speak variants</label>
+      <label><input type="checkbox" id="verbose-check"> Verbose output</label>
+      <button type="button" onclick="generateUsernames()">Generate Usernames</button>
+    </form>
+
+    <div class="tool-output" id="username-output"></div>
+
+    <p class="repo-text">
+      Repository: 
+      <a href="https://github.com/rachhavoc/tools" target="_blank" rel="noopener" class="repo-link">GitHub - generate_usernames.py</a>
+    </p>
   </section>
 
-  </main>
+  <!-- Password Generator Section -->
+  <section class="tool-section">
+    <h2>Smart Password Generator 🔑</h2>
+    <p>Enter a base password and generate variations with capitalization, numbers, special characters, and leetspeak.</p>
 
-    <!-- Footer -->
-  <footer>
-    <div class="wrap site-footer">
-      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a></p>
-      <p><a href="../index.html">Home</a></p>
-    </div>
-  </footer>
+    <form class="tool-form" id="password-generator-form">
+      <label>Enter a base password:</label>
+      <input type="text" id="base-password" placeholder="password">
+      <button type="button" onclick="generatePasswords()">Generate Variations</button>
+    </form>
 
-  <script src="/assets/css/js/script.js"></script>
+    <div class="tool-output" id="password-output">Simulation: Enter a password and click "Generate Variations".</div>
+
+    <p class="repo-text">
+      Repository: 
+      <a href="https://github.com/rachhavoc/tools/blob/main/smartpassgen.py" target="_blank" rel="noopener" class="repo-link">GitHub - smartpassgen.py</a>
+    </p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a> | <a href="https://www.linkedin.com/in/rachelcmurphy/" target="_blank" rel="noopener">LinkedIn</a></p>
+  </div>
+</footer>
+
+<script>
+function generateUsernames() {
+  const names = document.getElementById("names-input").value.split("\n").filter(n=>n.trim()!=="");
+  const domain = document.getElementById("domain-input").value.trim();
+  const leet = document.getElementById("leet-check").checked;
+  const verbose = document.getElementById("verbose-check").checked;
+  const output = [];
+
+  names.forEach(name=>{
+    const parts = name.trim().split(" ");
+    if(parts.length<2) return;
+    const first = parts[0].toLowerCase();
+    const last = parts[1].toLowerCase();
+
+    let usernames = [first+last, first+"."+last, first[0]+last, first+last[0]];
+
+    if(leet){
+      const leetVariants = usernames.map(u=>u.replace(/a/g,"4").replace(/e/g,"3").replace(/i/g,"1").replace(/o/g,"0").replace(/s/g,"5"));
+      usernames = usernames.concat(leetVariants);
+    }
+
+    usernames.forEach(u=>{
+      if(domain) output.push(u+"@"+domain);
+      else output.push(u);
+      if(verbose) output.push("[Generated for "+name+"]");
+    });
+  });
+
+  document.getElementById("username-output").innerText = Array.from(new Set(output)).join("\n");
+}
+
+function generatePasswords() {
+  const base = document.getElementById("base-password").value.trim();
+  if(!base){ document.getElementById("password-output").innerText="[!] Please enter a base password."; return; }
+
+  const specialChars = ["!", "@", "#", "$"];
+  const leetMap = {a:"@", e:"3", i:"1", o:"0", s:"5", t:"7"};
+  const variations = new Set();
+
+  // Capitalization variations
+  variations.add(base.charAt(0).toUpperCase()+base.slice(1));
+  variations.add(base.toUpperCase());
+  variations.add(base.toLowerCase());
+
+  // Numbers appended
+  ["1","123","2025"].forEach(num=>variations.add(base+num));
+  // Special characters appended
+  specialChars.forEach(ch=>variations.add(base+ch));
+  // Leetspeak transformations
+  function leetTransform(word){
+    return word.split("").map(c=>leetMap[c.toLowerCase()]||c).join("");
+  }
+  variations.add(leetTransform(base));
+  variations.add(leetTransform(base)+"!");
+  variations.add(leetTransform(base)+"123");
+  variations.add(leetTransform(base)+"2025");
+
+  document.getElementById("password-output").innerText = Array.from(variations).join("\n");
+}
+</script>
+
 </body>
 </html>

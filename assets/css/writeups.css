@@ -247,3 +247,18 @@ img {
   border: 2px solid #39ff14;
   border-radius: 6px;
 }
+
+
+.repo-link {
+  color: #39ff14; /* neon green */
+  text-decoration: none;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 6px #39ff14;
+}
+
+.repo-link:hover {
+  color: #ff6ec7; /* pink on hover */
+  text-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7;
+  letter-spacing: 1px;
+}
