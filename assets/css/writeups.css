@@ -1,4 +1,4 @@
-/* 🔥 Neon cyberpunk styling for writeups index page 🔥 */
+/* 🔥 Neon cyberpunk styling for writeups and cheatsheets 🔥 */
 
 body {
   background: #0b0b17;
@@ -24,9 +24,10 @@ header h1 {
 header p {
   color: #ff6ec7;
   font-size: 1.2rem;
-  margin-top: .5rem;
+  margin-top: 0.5rem;
 }
 
+/* Navbar */
 nav ul {
   display: flex;
   justify-content: center;
@@ -41,6 +42,7 @@ nav a {
   text-decoration: none;
   font-weight: bold;
   text-transform: uppercase;
+  transition: all 0.3s ease;
 }
 
 nav a:hover {
@@ -48,9 +50,9 @@ nav a:hover {
   text-shadow: 0 0 8px #ff6ec7;
 }
 
-/* Section styling */
+/* Section / writeups list styling */
 .writeups-list {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255,255,255,0.03);
   backdrop-filter: blur(5px);
   border-left: 4px solid #39ff14;
   border-radius: 12px;
@@ -111,12 +113,14 @@ nav a:hover {
   font-size: 1.3rem;
   text-decoration: none;
   transition: all 0.3s ease;
+  text-shadow: 0 0 6px #39ff14;
 }
 
 .writeups-list a:hover {
   color: #ff6ec7;
   text-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7;
   letter-spacing: 1px;
+  animation: neonPulse 1s infinite alternate;
 }
 
 /* Footer */
@@ -136,63 +140,13 @@ footer a:hover {
   color: #ff6ec7;
 }
 
-Copy button styling for code blocks
-.code-block {
-  position: relative;
-  margin: 1rem 0;
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+/* Neon pulsing animation */
+@keyframes neonPulse {
+  0%, 100% { text-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7; }
+  50% { text-shadow: 0 0 20px #ff6ec7, 0 0 40px #ff6ec7; }
 }
 
-.code-block pre {
-  margin: 0;
-  padding: 1rem;
-  background: #0f1724; /* dark background like markdown theme */
-  color: #e6eef6;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-Copy button
-.copy-btn {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  background: rgba(255,255,255,0.06);
-  color: #fff;
-  border: none;
-  padding: 6px 8px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  border-radius: 6px;
-  backdrop-filter: blur(2px);
-}
-.copy-btn:focus { outline: 2px solid #60a5fa; }
-.copy-btn.copied {
-  background: #10b981;
-  color: #fff;
-}
-
-Optional small success label
-.copy-label {
-  position: absolute;
-  right: 8px;
-  top: 36px;
-  background: rgba(0,0,0,0.6);
-  color: #fff;
-  padding: 4px 6px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  display: none;
-}
-.copy-label.show { display: inline-block; }
-
-
-/* ---------- Cheatsheet neon cyberpunk navbar ---------- */
+/* Cheatsheet navbar */
 .cheatsheet-navbar {
   display: flex;
   justify-content: space-between;
@@ -228,126 +182,57 @@ Optional small success label
   transition: all 0.3s ease;
 }
 
-.cheatsheet-navbar .nav-right a:hover {
-  color: #ff6ec7;
-  text-shadow: 0 0 8px #ff6ec7, 0 0 20px #ff6ec7;
-}
-
+.cheatsheet-navbar .nav-right a:hover,
 .cheatsheet-navbar .nav-right a.active {
   color: #ff6ec7;
-  text-shadow: 0 0 10px #ff6ec7, 0 0 30px #ff6ec7;
-}
-
-/* Neon glow effect for About page links */
-.writeups-list a {
-  color: #39ff14;
-  font-weight: bold;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  text-shadow: 0 0 6px #39ff14;
-}
-
-.writeups-list a:hover {
-  color: #ff6ec7;
-  text-shadow: 0 0 8px #ff6ec7, 0 0 20px #ff6ec7;
-  letter-spacing: 1px;
-}
-
-/* Neon pulsing animation */
-@keyframes neonPulse {
-  0%, 100% {
-    text-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7;
-  }
-  50% {
-    text-shadow: 0 0 20px #ff6ec7, 0 0 40px #ff6ec7;
-  }
-}
-
-/* Pulsing for links in writeups/about sections */
-.writeups-list a:hover {
-  animation: neonPulse 1s infinite alternate;
-}
-
-/* Optional: Pulse headers in about/writeups sections */
-.writeups-list h2,
-.writeups-list h3 {
-  transition: text-shadow 0.3s ease;
-}
-
-.writeups-list h2:hover,
-.writeups-list h3:hover {
-  animation: neonPulse 1.2s infinite alternate;
-}
-
-/* Pulsing nav-right active link */
-.cheatsheet-navbar .nav-right a.active {
-  animation: neonPulse 1s infinite alternate;
-}
-
-/* Pulsing nav links on hover */
-.cheatsheet-navbar .nav-right a:hover {
-  animation: neonPulse 1s infinite alternate;
-}
-
-/* Neon button style for LinkedIn */
-.neon-btn {
-  display: inline-block;
-  padding: 0.6rem 1.2rem;
-  font-size: 1.1rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  text-decoration: none;
-  color: #39ff14;
-  background: transparent;
-  border: 2px solid #39ff14;
-  border-radius: 8px;
-  text-shadow: 0 0 5px #39ff14, 0 0 10px #39ff14;
-  box-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14;
-  transition: all 0.3s ease;
-}
-
-.neon-btn:hover {
-  color: #ff6ec7;
-  border-color: #ff6ec7;
   text-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7;
-  box-shadow: 0 0 20px #ff6ec7, 0 0 40px #ff6ec7;
-  transform: translateY(-2px);
+  animation: neonPulse 1s infinite alternate;
 }
 
-.tools-placeholder {
-  color: #39ff14;
-  text-shadow: 0 0 6px #39ff14;
-  animation: pulseEmoji 1.5s infinite alternate;
+/* Code block with copy button */
+.code, .code-block {
+  position: relative;
+  margin: 1rem 0;
 }
 
-@keyframes pulseEmoji {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1) rotate(-3deg); }
-  100% { transform: scale(1); }
+.code pre, .code-block pre {
+  background: #1a1a2e;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", Courier, monospace;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #e6eef6;
 }
 
-Copy button
-
+/* Copy button inside code */
 .copy-btn {
   position: absolute;
-  right: 8px;
-  top: 8px;
-  background: rgba(255,255,255,0.06);
-  color: #39ff14; /* neon green */
-  border: none;
-  padding: 6px 8px;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(15,15,26,0.9);
+  color: #39ff14;
+  border: 1px solid #39ff14;
+  border-radius: 4px;
   cursor: pointer;
+  padding: 0.2rem 0.5rem;
   font-size: 0.85rem;
-  border-radius: 6px;
-  backdrop-filter: blur(2px);
-  box-shadow: 0 0 5px #39ff14, 0 0 15px #39ff14, 0 0 20px #39ff14;
   transition: all 0.3s ease;
+  z-index: 10;
 }
+
 .copy-btn:hover {
-  color: #ff6ec7; /* neon pink on hover */
-  box-shadow: 0 0 10px #ff6ec7, 0 0 20px #ff6ec7, 0 0 30px #ff6ec7;
+  color: #ff6ec7;
+  border-color: #ff6ec7;
+  text-shadow: 0 0 6px #ff6ec7;
 }
-.copy-btn:focus { outline: 2px solid #60a5fa; }
+
+.copy-btn:focus {
+  outline: 2px solid #60a5fa;
+}
 
 .copy-btn.copied {
   background: #10b981;
@@ -355,19 +240,10 @@ Copy button
   box-shadow: 0 0 10px #10b981, 0 0 20px #10b981, 0 0 30px #10b981;
 }
 
-  /* Screenshot styling */
-  img { max-width: 100%; margin: 0.5rem 0; border: 2px solid #39ff14; border-radius: 6px; }
-
-  /* Code block with copy button */
-  .code-block { position: relative; margin: 1rem 0; }
-  pre { background: #1a1a2e; padding: 1rem; border-radius: 6px; overflow-x: auto; }
-  .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: #0f0f1a; color: #39ff14; border: 1px solid #39ff14; border-radius: 4px; cursor: pointer; padding: 0.2rem 0.5rem; font-size: 0.8rem; transition: all 0.3s; }
-  .copy-btn:hover { color: #ff6ec7; border-color: #ff6ec7; text-shadow: 0 0 6px #ff6ec7; }
-
-header .copy-btn,
-nav .copy-btn,
-footer .copy-btn {
-  display: none !important;
+/* Images inside writeups */
+img {
+  max-width: 100%;
+  margin: 0.5rem 0;
+  border: 2px solid #39ff14;
+  border-radius: 6px;
 }
-
-

@@ -3,58 +3,83 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="description" content="Recon / Enumeration cheat sheet" />
+  <meta name="description" content="Recon / Info Gathering Cheat Sheet" />
   <title>Recon Cheat Sheet</title>
-  <link rel="stylesheet" href="../assets/css/writeups.css">
+  <link rel="stylesheet" href="/assets/css/writeups.css">
 </head>
-<body>
-  <nav class="cheatsheet-navbar">
-    <div class="nav-left">
-      <a href="../index.html" class="nav-logo">Portfolio</a>
+<body class="cheatsheet">
+
+<nav class="cheatsheet-navbar">
+  <div class="nav-left">
+    <a href="index.html" class="nav-logo">Portfolio</a>
+  </div>
+  <ul class="nav-right">
+    <li><a href="../writeups/">Writeups</a></li>
+    <li><a href="cheatsheet.html" class="active">Cheatsheets</a></li>
+  </ul>
+</nav>
+
+<header class="site-header">
+  <div class="wrap">
+    <h1>Recon / Info Gathering</h1>
+    <nav class="main-nav">
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="recon.html" class="active">Recon</a></li>
+        <li><a href="windows.html">Windows</a></li>
+        <li><a href="web.html">Web</a></li>
+        <li><a href="privesc.html">PrivEsc</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main class="cheatsheet-content">
+  <article>
+
+    <h2>Network Scanning</h2>
+    <div class="code">
+      <button class="copy-btn" data-target="r1">Copy</button>
+      <pre><code id="r1">nmap -sC -sV -oN scan.txt 10.10.10.10</code></pre>
     </div>
-    <ul class="nav-right">
-      <li><a href="../writeups/">Writeups</a></li>
-      <li><a href="cheatsheet.html" class="active">Cheatsheets</a></li>
-    </ul>
-  </nav>
 
-  <header class="site-header">
-    <div class="wrap">
-      <h1>Recon / Enumeration</h1>
-      <nav class="main-nav">
-        <ul>
-          <li><a href="../index.html">Home</a></li>
-          <li><a href="recon.html" class="active">Recon</a></li>
-          <li><a href="windows.html">Windows</a></li>
-          <li><a href="web.html">Web</a></li>
-          <li><a href="privesc.html">PrivEsc</a></li>
-        </ul>
-      </nav>
+    <div class="code">
+      <button class="copy-btn" data-target="r2">Copy</button>
+      <pre><code id="r2">masscan -p0-65535 10.10.10.0/24</code></pre>
     </div>
-  </header>
 
-  <main class="cheatsheet-content cheatsheet">
-    <article>
-      <h2>Nmap / Port scanning</h2>
-      <pre><code>nmap -sC -sV -oA target target-ip</code></pre>
-
-      <h2>Service Enumeration</h2>
-      <pre><code>enum4linux -a target-ip</code></pre>
-      <pre><code>smbclient -L \\\\target-ip</code></pre>
-
-      <h2>Other Recon Tools</h2>
-      <pre><code>rpcclient -U "" target-ip</code></pre>
-      <pre><code>ldapsearch -x -h target-ip -D "user" -W</code></pre>
-    </article>
-  </main>
-
-  <footer class="site-footer">
-    <div class="wrap">
-      <p>© Rachel Murphy 2025</p>
-      <p><a href="../index.html">Back</a></p>
+    <h2>Service Enumeration</h2>
+    <div class="code">
+      <button class="copy-btn" data-target="r3">Copy</button>
+      <pre><code id="r3">enum4linux -a 10.10.10.10</code></pre>
     </div>
-  </footer>
 
-  <script src="../assets/css/js/script.js"></script>
+    <div class="code">
+      <button class="copy-btn" data-target="r4">Copy</button>
+      <pre><code id="r4">smbclient -L //10.10.10.10 -U guest</code></pre>
+    </div>
+
+    <h2>OSINT / Web Recon</h2>
+    <div class="code">
+      <button class="copy-btn" data-target="r5">Copy</button>
+      <pre><code id="r5">theHarvester -d target.com -b all</code></pre>
+    </div>
+
+    <div class="code">
+      <button class="copy-btn" data-target="r6">Copy</button>
+      <pre><code id="r6">whois target.com</code></pre>
+    </div>
+
+  </article>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>© Rachel Murphy 2025</p>
+    <p><a href="index.html">Back</a></p>
+  </div>
+</footer>
+
+<script src="/assets/css/js/script.js"></script>
 </body>
 </html>
