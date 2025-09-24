@@ -1,12 +1,12 @@
 // script.js
 // Copy buttons for code blocks and .copyable elements
-// Scoped to content areas only (main/article/.wrap/.content) and safe to include once.
+// Only enabled in pages marked for cheatsheets (via body class "cheatsheet")
+// Scoped to content areas only (main/article/.wrap/.content)
 (function () {
   // Helper: fallback copy using execCommand(select+copy)
   function fallbackCopyTextToClipboard(text) {
     var textArea = document.createElement("textarea");
     textArea.value = text;
-    // Avoid scrolling to bottom
     textArea.style.position = "fixed";
     textArea.style.top = "-9999px";
     document.body.appendChild(textArea);
@@ -31,7 +31,6 @@
   }
 
   function makeCopyButton(container, textToCopy) {
-    // prevent adding multiple buttons to same container
     if (container.querySelector('.copy-btn')) return;
 
     var btn = document.createElement("button");
@@ -55,7 +54,6 @@
           label.classList.remove("show");
         }, 1800);
       }, function () {
-        // fallback: attempt to select and allow user to press Ctrl+C
         try {
           fallbackCopyTextToClipboard(textToCopy);
           btn.classList.add("copied");
@@ -78,50 +76,37 @@
 
   // Utility: check if an element is inside header/nav/footer or has .no-copy ancestor
   function isInExcludedRegion(el) {
-    return !!el.closest('header, nav, footer, .site-header, .site-footer, .no-copy');
+    return !!el.closest(
+      'header, nav, footer, .site-header, .site-footer, .main-nav, .no-copy'
+    );
   }
 
-  // Run after DOM ready
   document.addEventListener('DOMContentLoaded', function () {
-    // Define allowed content containers (scoped)
+    // Only enable copy buttons if body has class "cheatsheet"
+    if (!document.body.classList.contains('cheatsheet')) return;
+
     var contentSelectors = ['main', 'article', '.wrap', '.content', '.post', '.entry'];
     var contentRoots = [];
     contentSelectors.forEach(function (sel) {
       document.querySelectorAll(sel).forEach(function (n) { contentRoots.push(n); });
     });
-
-    // If no explicit content roots found, fall back to body but still exclude header/nav/footer
     if (contentRoots.length === 0) contentRoots.push(document.body);
 
-    // For each root, find pre>code and .copyable elements and add buttons (unless excluded)
     contentRoots.forEach(function (root) {
-      // pre > code blocks
       root.querySelectorAll('pre > code').forEach(function (codeEl) {
         var pre = codeEl.parentNode;
-        // skip if inside excluded region
         if (isInExcludedRegion(pre)) return;
-        // don't double-wrap if already in .code-block
         if (!pre.classList.contains('code-block') && !pre.closest('.code-block')) {
           var wrapper = document.createElement('div');
           wrapper.className = 'code-block';
           pre.parentNode.insertBefore(wrapper, pre);
           wrapper.appendChild(pre);
-          // preserve visible formatting (trim trailing newline if needed)
           var text = codeEl.innerText.replace(/\r\n/g, '\n');
           makeCopyButton(wrapper, text);
-        } else {
-          // Already has .code-block ancestor: ensure it has a button
-          var existingRoot = pre.closest('.code-block');
-          if (existingRoot && !isInExcludedRegion(existingRoot)) {
-            var text = codeEl.innerText.replace(/\r\n/g, '\n');
-            makeCopyButton(existingRoot, text);
-          }
         }
       });
 
-      // elements marked .copyable
       root.querySelectorAll('.copyable').forEach(function (el) {
-        // skip if inside excluded region or already inside a code-block
         if (isInExcludedRegion(el) || el.closest('.code-block')) return;
         var wrapper = document.createElement('div');
         wrapper.className = 'code-block';
@@ -132,7 +117,7 @@
       });
     });
 
-    // Mobile nav toggle (optional)
+    // Mobile nav toggle
     const toggleBtn = document.querySelector(".nav-toggle");
     const navLinks = document.querySelector(".nav-right");
     if (toggleBtn && navLinks) {

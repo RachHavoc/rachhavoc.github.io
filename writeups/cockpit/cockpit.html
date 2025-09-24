@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Cockpit Writeup - Rachel Murphy" />
+  <title>PG: Cockpit | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .meta { color: #cbd5e1; font-size: 0.95rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="wrap">
+      <h1>Cockpit — Writeup</h1>
+      <p class="meta">Proving Grounds — Linux / Web Exploitation & Privilege Escalation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> The “Cockpit” VM is an intermediate-level Linux machine created by OffSec for penetration testing training. It tests reconnaissance, web exploitation and privilege escalation skills, culminating in a tar wildcard vulnerability exploit to gain root.</p>
+
+      <h3>Key Features</h3>
+      <ul>
+        <li>Reconnaissance of multiple services (HTTP, HTTPS, SSH).</li>
+        <li>SQL Injection to bypass a web login and harvest credentials.</li>
+        <li>Privilege escalation via tar wildcard exploit.</li>
+      </ul>
+    </section>
+
+    <!-- Recon -->
+    <section>
+      <h2>Initial Reconnaissance</h2>
+      <div class="code-block">
+        <pre>sudo nmap -sC -sV 192.168.236.10 -oN nmap-cockpit</pre>
+      </div>
+      <img src="../images/Pasted image 20250710133057.png" alt="Nmap scan" class="screenshot">
+
+      <p>All ports:</p>
+      <div class="code-block">
+        <pre>sudo nmap -p- -sC -sV 192.168.236.10 -oN nmap-cockpit</pre>
+      </div>
+      <img src="../images/Pasted image 20250710142411.png" alt="All ports" class="screenshot">
+    </section>
+
+    <!-- Web 9090 -->
+    <section>
+      <h2>Web (Port 9090)</h2>
+      <img src="../images/Pasted image 20250710133252.png" alt="Cockpit login page" class="screenshot">
+      <p>Login page running Blaze server. Tried common defaults (admin:admin, ubuntu:ubuntu) with no success:</p>
+      <img src="../images/Pasted image 20250710133519.png" alt="Login attempts" class="screenshot">
+
+      <h3>Feroxbuster</h3>
+      <div class="code-block">
+<pre>feroxbuster -u https://192.168.236.10:9090/ -k -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o ferox.9000</pre>
+      </div>
+      <img src="../images/Pasted image 20250710134033.png" alt="Ferox results" class="screenshot">
+      <img src="../images/Pasted image 20250710134111.png" alt="/ping endpoint" class="screenshot">
+
+      <h3>Public Exploits</h3>
+      <img src="../images/Pasted image 20250710134241.png" alt="Search public exploits" class="screenshot">
+      <img src="../images/Pasted image 20250710134431.png" alt="Login bypass idea" class="screenshot">
+      <img src="../images/Pasted image 20250710134523.png" alt="Payload test" class="screenshot">
+      <img src="../images/Pasted image 20250710134603.png" alt="Error response" class="screenshot">
+      <img src="../images/Pasted image 20250710134803.png" alt="Options dropdown" class="screenshot">
+      <img src="../images/Pasted image 20250710134930.png" alt="127.0.0.1 attempt" class="screenshot">
+
+      <p>More directories discovered by Ferox but all redirected to login:</p>
+      <img src="../images/Pasted image 20250710135047.png" alt="More directories" class="screenshot">
+      <img src="../images/Pasted image 20250710135216.png" alt="Redirect to login" class="screenshot">
+    </section>
+
+    <!-- Burp & Curl -->
+    <section>
+      <h2>Burp & Curl Testing</h2>
+      <img src="../images/Pasted image 20250710135413.png" alt="Burp intercept" class="screenshot">
+
+      <p>Test endpoints with curl:</p>
+      <div class="code-block">
+<pre>curl -k https://192.168.236.10:9090/
+curl -k https://192.168.236.10:9090/ping
+curl -k https://192.168.236.10:9090/socket</pre>
+      </div>
+      <img src="../images/Pasted image 20250710142838.png" alt="Base curl" class="screenshot">
+      <img src="../images/Pasted image 20250710142950.png" alt="Ping curl" class="screenshot">
+      <img src="../images/Pasted image 20250710143042.png" alt="Socket curl" class="screenshot">
+      <img src="../images/Pasted image 20250710143325.png" alt="Intercept details" class="screenshot">
+      <img src="../images/Pasted image 20250710143412.png" alt="Cookie stand-out" class="screenshot">
+      <img src="../images/Pasted image 20250710143432.png" alt="Cookie idea" class="screenshot">
+    </section>
+
+    <!-- Web 80 -->
+    <section>
+      <h2>Web (Port 80)</h2>
+      <img src="../images/Pasted image 20250710133746.png" alt="Port 80 site" class="screenshot">
+
+      <h3>Feroxbuster</h3>
+      <div class="code-block">
+<pre>feroxbuster -u http://192.168.236.10/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o ferox.80</pre>
+      </div>
+      <img src="../images/Pasted image 20250710133957.png" alt="Ferox 80 results" class="screenshot">
+
+      <p>Enum /js/ directory:</p>
+      <div class="code-block">
+<pre>feroxbuster -u http://192.168.236.10/js/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o ferox.js -scan-dir-listings</pre>
+      </div>
+      <img src="../images/Pasted image 20250710144737.png" alt="Ferox js results" class="screenshot">
+
+      <p>Re-run with likely file extensions:</p>
+      <div class="code-block">
+<pre>feroxbuster -u http://192.168.236.10/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt -o ferox.rerun</pre>
+      </div>
+      <img src="../images/Pasted image 20250710145302.png" alt="Login.php found" class="screenshot">
+      <img src="../images/Pasted image 20250710145350.png" alt="Another login" class="screenshot">
+    </section>
+
+    <!-- SQLi -->
+    <section>
+      <h2>SQL Injection & Credentials</h2>
+      <p>Tried various payloads and observed responses:</p>
+      <img src="../images/Pasted image 20250710145718.png" alt="admin payload" class="screenshot">
+      <img src="../images/Pasted image 20250710145902.png" alt="OR 1=1 attempt" class="screenshot">
+      <img src="../images/Pasted image 20250710145924.png" alt="Filtered payload" class="screenshot">
+      <img src="../images/Pasted image 20250710150312.png" alt="UNION attempt" class="screenshot">
+      <img src="../images/Pasted image 20250710150758.png" alt="Different syntax" class="screenshot">
+
+      <h3>Successful Login</h3>
+      <div class="code-block">
+        <pre>admin' #</pre>
+      </div>
+      <img src="../images/Pasted image 20250710151236.png" alt="Successful login payload" class="screenshot">
+      <img src="../images/Pasted image 20250710151453.png" alt="Google suggestion" class="screenshot">
+
+      <h3>Credentials Harvested</h3>
+      <img src="../images/Pasted image 20250710151549.png" alt="User credentials" class="screenshot">
+      <p>Decoded base64:</p>
+      <div class="code-block">
+<pre>james:canttouchhhthiss@455152
+cameron:thisscanttbetouchedd@455152</pre>
+      </div>
+      <img src="../images/Pasted image 20250710151701.png" alt="Cyberchef decode" class="screenshot">
+    </section>
+
+    <!-- SSH Login -->
+    <section>
+      <h2>SSH Login via Key</h2>
+      <img src="../images/Pasted image 20250710152153.png" alt="Login to 9090" class="screenshot">
+      <img src="../images/Pasted image 20250710152219.png" alt="Inside dashboard" class="screenshot">
+      <img src="../images/Pasted image 20250710152436.png" alt="Add SSH key" class="screenshot">
+
+      <p>Generated SSH key and pasted public key:</p>
+      <div class="code-block">
+<pre>ssh-keygen
+chmod 600 id_james
+ssh james@192.168.236.10 -i id_james</pre>
+      </div>
+      <img src="../images/Pasted image 20250710155256.png" alt="Key pasted" class="screenshot">
+      <img src="../images/Pasted image 20250710155322.png" alt="Key added" class="screenshot">
+      <img src="../images/Pasted image 20250710155454.png" alt="SSH login success" class="screenshot">
+      <img src="../images/Pasted image 20250710155628.png" alt="Flag captured" class="screenshot">
+    </section>
+
+    <!-- Priv Esc -->
+    <section>
+      <h2>Privilege Escalation</h2>
+      <div class="code-block">
+        <pre>sudo -l</pre>
+      </div>
+      <img src="../images/Pasted image 20250710155534.png" alt="sudo -l output" class="screenshot">
+      <p>User can run tar as root. Exploit tar wildcard vulnerability:</p>
+      <a href="https://morgan-bin-bash.gitbook.io/linux-privilege-escalation/tar-wildcard-injection-privesc">Helpful guide</a>
+      <img src="../images/Pasted image 20250710160324.png" alt="tmp directory" class="screenshot">
+      <img src="../images/Pasted image 20250710160338.png" alt="Exploit files creation" class="screenshot">
+      <img src="../images/Pasted image 20250710160354.png" alt="Three files" class="screenshot">
+
+      <div class="code-block">
+<pre>sudo /usr/bin/tar -czvf /tmp/backup.tar.gz *</pre>
+      </div>
+      <img src="../images/Pasted image 20250710160533.png" alt="Tar exploit run" class="screenshot">
+      <img src="../images/Pasted image 20250710160725.png" alt="Root shell" class="screenshot">
+      <img src="../images/Pasted image 20250710160756.png" alt="Root proof" class="screenshot">
+      <img src="../images/Pasted image 20250710160900.png" alt="Easter egg" class="screenshot">
+      <img src="../images/Pasted image 20250710160935.png" alt="Easter egg cont" class="screenshot">
+    </section>
+
+    <section>
+      <h2>Key Takeaways</h2>
+      <ul>
+        <li>Always re-run directory scans with likely file extensions.</li>
+        <li>SQL Injection can still bypass login even with filters if syntax is adjusted.</li>
+        <li>Tar wildcard privilege escalation is a classic and powerful technique.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+    <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
+  </footer>
+
+</body>
+</html>

