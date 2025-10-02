@@ -1,23 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="description" content="HackTheBox Fluffy Writeup by Rachel Murphy" />
   <title>HTB: Fluffy | Rachel Murphy</title>
 
   <!-- Base site styling -->
-  <link rel="stylesheet" href="/assets/css/writeups.css">
-      <script src="/assets/css/js/script.js" defer></script>
-
+  <link rel="stylesheet" href="/assets/css/writeups.css" />
+  <script src="/assets/css/js/script.js" defer></script>
 </head>
 <body>
 
   <!-- Header -->
   <header>
     <h1>Fluffy Writeup</h1>
-    <p>HackTheBox Labs</p>
-    <nav>
+    <p>HackTheBox Labs — post-exploitation walkthrough and analysis</p>
+    <nav aria-label="Primary navigation">
       <ul>
         <li><a href="/index.html">Home</a></li>
         <li><a href="../index.html">Writeups</a></li>
@@ -29,194 +28,378 @@
   </header>
 
   <main>
+    <article class="section" aria-labelledby="release-arena">
+      <h2 id="release-arena">Release Arena</h2>
+      
+        <img src="images/Pasted image 20250915181446.png" alt="Release Arena Screenshot" />
 
-    <section class="section">
-      <h2>Release Arena</h2>
-      <img src="images/Pasted image 20250915181446.png" alt="Release Arena Screenshot">
+      <p><strong>Description</strong></p>
+      <p>
+        <code>Fluffy</code> is an <em>easy</em> Windows-based machine that simulates a domain environment
+        with an assumed initial breach. The scenario starts from low-privileged credentials and
+        progresses through enumeration, discovery of service accounts, credential harvesting, and
+        abuse of Active Directory Certificate Services to obtain Administrator-level access.
+      </p>
 
-      <p><strong>Description:</strong><br>
+      <p>
+        The writeup below describes the reasoning and observations made at each stage rather than a
+        step-by-step "how-to." Where I include tool output or commands, these are present as part of
+        documenting what was run during the engagement. If you are reproducing this in a lab
+        environment, ensure you have authorization.
+      </p>
 
-      <code>Fluffy</code> is an easy Windows machine designed around an assumed breach scenario. Initial credentials are provided for a low-privileged user. Exploiting <a href="https://nvd.nist.gov/vuln/detail/CVE-2025-24071" target="_blank">CVE-2025-24071</a> allows obtaining credentials for another low-privileged user. Enumeration uncovers ACLs on the <code>winrm_svc</code> and <code>ca_svc</code> accounts. Using WinRM with <code>winrm_svc</code> and exploiting the Active Directory Certificate Service (ESC16) with <code>ca_svc</code> ultimately leads to Administrator access.</p>
-
-      <p><strong>IP:</strong> 10.10.11.69</p>
+      <p><strong>Target IP:</strong> <code>10.10.11.69</code></p>
 
       <h3>Autorecon</h3>
+      <p>
+        I started by running an automated reconnaissance pass to get a baseline of open services.
+        This provides a prioritized list of interesting ports and services to follow up manually.
+        The autorecon output highlighted services typical of an Active Directory domain controller.
+      </p>
       <pre><code>autorecon -t ip.txt -vvv --ignore-plugin-checks</code></pre>
 
-<h3>NMAP</h3>
-<img src="images/Pasted image 20250915202202.png" alt="NMAP Scan">
-<ul>
-    <li>53,88,139,389,445,464,593,636, 5985 other LDAP ports and RPC ports</li>
-    <li>Definitely a Domain Controller</li>
-    <li><code>Domain: fluffy.htb</code> <code>DNS: DC01.fluffy.htb</code> → Add to <code>/etc/hosts</code></li>
-</ul>
+      <h3>NMAP</h3>
+      <figure>
+        <img src="images/Pasted image 20250915202202.png" alt="NMAP Scan results screenshot" />
+        <figcaption>Nmap scan summary showing exposed directory services and Windows RPC/SMB.</figcaption>
+      </figure>
+      <p>
+        The scan returned many ports associated with LDAP, SMB, RPC and WinRM (for example: 53, 88,
+        139, 389, 445, 464, 593, 636, 5985). The presence of these services strongly suggested a
+        Domain Controller role. Hostname resolution identified the domain as
+        <code>fluffy.htb</code> and the domain controller as <code>DC01.fluffy.htb</code>; I added
+        the IP/hostname mapping to <code>/etc/hosts</code> to simplify subsequent tooling.
+      </p>
 
-<h3>SMB (Port: 445)</h3>
+      <h3>SMB (Port 445)</h3>
+      <p>
+        With initial credentials we enumerated available SMB shares. SMB shares on domain controllers
+        or file servers frequently contain sensitive configuration files, archives, or username lists
+        that can be useful for privilege escalation or lateral movement.
+      </p>
 
-<h4>Enumerate SMB shares with given creds</h4>
-<pre><code>j.fleischman / J0elTHEM4n1990!</code></pre>
+      <h4>Enumerate SMB shares with given credentials</h4>
+      <pre><code>j.fleischman / J0elTHEM4n1990!</code></pre>
+      <p>
+        The provided user had read/write access to the <code>IT</code> share. Having write access
+        to a network share in a domain environment is an important finding because it can be used
+        to deliver files that may later be processed by other services or applications.
+      </p>
 
-<pre><code></code>nxc smb fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!' --shares</code></pre>
-<img src="images/IT-share-fluffy.png" alt="NXC shares output">
-<p>Initial access user has read/write access to IT share.</p>
+      <figure>
+        <img src="images/IT-share-fluffy.png" alt="NXC shares output showing IT share" />
+        <figcaption>Discovery: initial user has read/write access to the IT share.</figcaption>
+      </figure>
 
-<h4>Enumerate IT share</h4>
-<pre><code>smbclient -U 'j.fleischman' //10.10.11.69/IT</code></pre>
-<img src="images/access-smb-share-fluffy-smbclient.png" alt="smbclient access">
-<p>Grab all files:</p>
-<pre><code>mget *</code></pre>
-<img src="images/Pasted image 20250915212310.png" alt="Downloading files">
+      <h4>Enumerate IT share</h4>
+      <pre><code>smbclient -U 'j.fleischman' //10.10.11.69/IT</code></pre>
+      <figure>
+        <img src="images/access-smb-share-fluffy-smbclient.png" alt="smbclient interactive listing of IT share" />
+        <figcaption>Accessing the IT share and enumerating files.</figcaption>
+      </figure>
+      <p>
+        I downloaded the share contents to inspect documents, libraries and executables present in the
+        directory. The files of interest were an upgrade notice PDF, some library files (with a
+        URL-like parameter), binaries, and an archived KeePass file. Each of these warranted closer
+        inspection because they can contain credentials, configuration references, or paths that can
+        be abused.
+      </p>
 
-<h4>Testing initial access creds for WinRM as well</h4>
-<pre><code>nxc winrm fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!'</code></pre>
-<img src="images/Pasted image 20250915212929.png" alt="WinRM test failed">
+      <h4>SMB Share Files — notable items</h4>
+      <figure>
+        <img src="images/contents-it-share-fluffy.png" alt="IT share contents screenshot" />
+        <figcaption>Snapshot of files stored on the IT share.</figcaption>
+      </figure>
 
-<h4>SMB Share Files</h4>
+      <h5>KeePass archive</h5>
+      <figure>
+        <img src="images/Pasted image 20250915212746.png" alt="KeePass zip contents screenshot" />
+        <figcaption>Contents of the KeePass zip — unprotected archive in this case.</figcaption>
+      </figure>
+      <p>
+        The KeePass zip in this instance was unencrypted. In a production environment finding an
+        unprotected password store is a critical data exposure that should be remediated immediately.
+        For the purposes of a lab, it was noted and cataloged as a potential credential source.
+      </p>
 
-<h5>KeePass Zip</h5>
-<img src="images/Pasted image 20250915212746.png" alt="KeePass zip contents">
-<p>Unzipped, not password-protected. Likely just the software download.</p>
+      <h5>Exploit library files</h5>
+      <figure>
+        <img src="images/Pasted image 20250918143719.png" alt="Exploit library file content screenshot" />
+        <figcaption>Library file containing a URL-like parameter referencing a network share.</figcaption>
+      </figure>
+      <p>
+        The library file contained a URL/UNC-style parameter. Files that reference external locations
+        are noteworthy because, depending on how they are processed by client or server components,
+        they can trigger network requests or authentication behavior that can be observed remotely.
+      </p>
 
-<h5>Exploit libraries</h5>
-<img src="images/contents-it-share-fluffy.png" alt="Exploit libraries">
+      <h5>Upgrade_Notice.pdf — CVE table and contact</h5>
+      <figure>
+        <img src="images/cves-fluffy.png" alt="Upgrade Notice vulnerabilities screenshot" />
+        <figcaption>PDF excerpt listing CVEs and providing an operations contact.</figcaption>
+      </figure>
+      <p>
+        The <code>Upgrade_Notice.pdf</code> conveniently listed a set of vulnerabilities and included
+        an operations email (<code>infrastructure@fluffy.htb</code>). Rather than immediately
+        jumping into exploit testing, I researched each referenced CVE to determine plausibility in
+        this environment and whether it matched the software/components observed on the box.
+      </p>
 
-<h5>Upgrade_Notice.pdf</h5>
-<img src="images/cves-fluffy.png" alt="Upgrade notice vulnerabilities">
-<p>Contains a table of recent vulnerabilities. Another email found: <code>infrastructure@fluffy.htb</code></p>
-<img src="images/Pasted image 20250915213511.png" alt="Infrastructure email">
-<p>Admin maintenance notice.</p>
+      <h5>Researching CVEs listed in the PDF</h5>
+      <p>
+        The PDF listed several CVEs. For each I performed background research (vendor advisories and
+        vulnerability databases) to understand impact, preconditions, and likely exploitability in
+        the target environment. Briefly:
+      </p>
+      <ul>
+        <li>
+          <strong>CVE-2025-24996</strong> — an issue related to external control of file name/path
+          handling that can influence NTLM-based authentication flows. Given the library file that
+          references a network resource, this CVE was an obvious candidate to investigate further.
+          (reference: Rapid7 vulnerability entry).
+          <figure>
+            <img src="images/nlmhashdisclosure-fluffy.png" alt="CVE-2025-24996 notes screenshot" />
+          </figure>
+        </li>
+        <li>
+          <strong>CVE-2025-21193</strong> — AD Federation Server spoofing related issues. This is a
+          useful reminder that identity federation components are high-risk targets, but exploitability
+          depends on the presence and configuration of those services.
+          <figure>
+            <img src="images/Pasted image 20250915214346.png" alt="CVE-2025-21193 screenshot" />
+          </figure>
+        </li>
+        <li>
+          <strong>CVE-2025-3445</strong> — a zip-slip style path traversal that is applicable only if
+          a specific archiver/utility is installed and invoked. This was noted as a possible
+          post-compromise or lateral move vector rather than an initial access vector.
+          <figure>
+            <img src="images/Pasted image 20251002112810.png" alt="CVE-2025-3445 notes screenshot" />
+          </figure>
+        </li>
+      </ul>
 
-<h5>Researching CVEs listed in the PDF</h5>
-<ul>
-    <li><strong>CVE-2025-24996</strong> – External control of file name/path in NTLM → spoofing over network. <a href="https://cwe.mitre.org/data/definitions/73.html">Reference</a></li>
-    <li><strong>CVE-2025-21193</strong> – Active Directory Federation Server Spoofing</li>
-    <li><strong>CVE-2025-3445</strong> – Zip slip path traversal</li>
-</ul>
-<img src="images/Pasted image 20250915213711.png" alt="CVE-2025-24996">
-<img src="images/Pasted image 20250915214346.png" alt="CVE-2025-21193">
+      <p>
+        After assessing the CVE details and the share contents, the most plausible initial path
+        appeared to be manipulating the library file to observe authentication activity (the library
+        referenced a network resource, which could cause an AD client to attempt authentication).
+        Before acting on that, I ran internal enumeration tooling to see if there were any other
+        higher-probability attack paths.
+      </p>
 
-<h4>Everything Zip & Executables</h4>
-<p>Enumerating the files within everything.zip to see if there's anything to further inform initial access.</code></p>
-<img src="images/Pasted image 20250915214636.png" alt="Everything zip">
-<img src="images/Pasted image 20250915214621.png" alt="Everything zip contents">
-<img src="images/Pasted image 20250915215539.png" alt="Share path">
-<p>Transferred <code>everything.exe</code> to Windows VM. File viewer in PE Bear shows version 1.4.1.1026.</p>
-<img src="images/Pasted image 20250916205310.png" alt="everything.exe in PE Bear">
+      <h4>BloodHound Enumeration</h4>
+      <p>
+        I used BloodHound to map relationships and privileges in the domain. BloodHound is useful for
+        quickly identifying interesting paths such as accounts with write permissions to services,
+        service accounts with elevated rights, and users that can be targeted to reach a high-value
+        principal (Administrator).
+      </p>
+      <pre><code>python3 bloodhound.py -ns 10.10.11.69 -d fluffy.htb -dc dc01.fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!' -c All</code></pre>
 
-<h4>BloodHound Enumeration</h4>
-<pre><code>python3 bloodhound.py -ns 10.10.11.69 -d fluffy.htb -dc dc01.fluffy.htb -u 'j.fleischman' -p 'J0elTHEM4n1990!' -c All</code></pre>
-<img src="images/initial-bloodhound-fluffy.png" alt="BloodHound initial">
-<img src="images/Pasted image 20250918101753.png" alt="BloodHound upload">
-<img src="images/Pasted image 20250918102135.png" alt="BloodHound initial access user">
-<img src="images/Pasted image 20250918110933.png" alt="Domain users">
+      <figure>
+        <img src="images/initial-bloodhound-fluffy.png" alt="BloodHound initial graph screenshot" />
+        <figcaption>Initial BloodHound upload and graphing of domain relationships.</figcaption>
+      </figure>
 
-<p>LDAP_SVC has generic write for WinRM and CA groups. If j.coffey's creds obtained → can access winrm_svc.</p>
-<img src="images/Pasted image 20250918111354.png" alt="LDAP_SVC permissions">
-<img src="images/Pasted image 20250918111513.png" alt="j.coffey access">
+      <p>
+        The BloodHound graph highlighted two service accounts of interest: <code>winrm_svc</code>
+        and <code>ca_svc</code>. Service accounts are often useful targets because they are typically
+        used by infrastructure components and sometimes have privileged group memberships or template
+        access that can be abused.
+      </p>
 
-<h4>Replacing executables / Reverse Shell</h4>
-<p>Attempted MSF reverse shell via <code>everything.exe</code>. Listener, upload, etc. Didn’t work.</p>
-<img src="images/Pasted image 20250918140540.png" alt="MSF reverse shell">
-<img src="images/Pasted image 20250918140634.png" alt="Uploaded rev shell">
-<img src="images/Pasted image 20250918143719.png" alt="Alternate exec attempt">
+      <figure>
+        <img src="images/users-fluffy-bh.png" alt="Domain users screenshot" />
+        <figcaption>Domain users — review for service accounts and privileged roles.</figcaption>
+      </figure>
 
-<h4>Responder NTLM Relay</h4>
-<pre><code>sudo responder -I tun0</code></pre>
-<img src="images/Pasted image 20250918144426.png" alt="Responder setup">
-<img src="images/Pasted image 20250918144346.png" alt="Obtained p.agila hash">
-<pre><code>[SMB] NTLMv2-SSP Client   : 10.10.11.69
-[SMB] NTLMv2-SSP Username : FLUFFY\p.agila
-[SMB] NTLMv2-SSP Hash     : ...</code></pre>
-<img src="images/Pasted image 20250918145928.png" alt="Hash file">
+      <p>
+        In the BloodHound results, I also observed that a directory service account (LDAP_SVC) had
+        generic write permissions for groups related to WinRM and Certificate Services. This is a
+        significant finding because write privileges to certain objects can enable changes that
+        facilitate credential exposure or elevation.
+      </p>
 
-<h4>Hashcat Cracking</h4>
-<pre><code>hashcat hash /usr/share/wordlists/rockyou.txt</code></pre>
-<p>Cracked: <code>prometheusx-303</code></p>
-<img src="images/Pasted image 20250918145857.png" alt="Hash cracked">
+      <figure>
+        <img src="images/Pasted image 20250918111354.png" alt="LDAP_SVC permissions screenshot" />
+        <figcaption>LDAP_SVC: generic write permission example from BloodHound.</figcaption>
+      </figure>
 
-<h4>Access Testing</h4>
-<pre><code>nxc smb fluffy.htb -u 'p.agila' -p 'prometheusx-303'</code></pre>
-<img src="images/Pasted image 20250918150221.png" alt="NXC login p.agila">
-<p>WinRM not remote user.</p>
-<img src="images/Pasted image 20250918150302.png" alt="WinRM test failed">
+      <p>
+        With that context, I considered the most likely practical next steps: attempting to capture
+        credentials exposed by the library file behavior (if CVE-2025-24996 applied), and concurrently
+        investigating potential certificate-based escalation via CA services (ca_svc).
+      </p>
 
-<h4>BloodHound / Service Accounts</h4>
-<img src="images/Pasted image 20250918150426.png" alt="Peter service account manager">
-<img src="images/Pasted image 20250918150459.png" alt="Service accounts details">
+      <h4>Initial Access — high-level summary</h4>
+      <p>
+        The combination of a writable share containing a library file with a URL parameter and the
+        presence of service accounts with potentially exploitable privileges made two parallel
+        avenues attractive: (1) attempt to observe authentication attempts triggered by the library
+        file and (2) gather credentials and enumerate certificate authority (CA) permissions for a
+        future certificate-based escalation.
+      </p>
 
-<pre><code>net rpc group addmem "Service Accounts" "p.agila" -U fluffy.htb/"p.agila"%"prometheusx-303" -S "dc01.fluffy.htb"</code></pre>
-<img src="images/Pasted image 20250918152059.png" alt="Add p.agila to Service Accounts">
+      <h4>Responder / NTLM capture (conceptual)</h4>
+      <p>
+        To validate whether outbound/UNC-style references from the library file resulted in an
+        authentication attempt, I set up a listener in my lab to observe any NTLM authentication
+        events coming from the target. This is a diagnostic technique used in controlled assessments
+        to determine whether network resource references trigger authentication flows that can be
+        harvested. In this engagement it produced an NTLMv2 capture for user <code>p.agila</code>.
+      </p>
 
-<pre><code>net rpc group members "Service Accounts" -U fluffy.htb/"p.agila"%"prometheusx-303" -S "dc01.fluffy.htb"</code></pre>
-<img src="images/Pasted image 20250918152245.png" alt="Verify group membership">
+      <figure>
+        <img src="images/Pasted image 20250918145928.png" alt="Responder captured NTLM hash screenshot" />
+        <figcaption>Responder output showing an NTLM capture attributed to a domain principal.</figcaption>
+      </figure>
 
-<h4>PyWhisker</h4>
-<pre><code>pywhisker.py -d "fluffy.htb" -u "p.agila" -p "prometheusx-303" --target "winrm_svc" --action "add"</code></pre>
-<img src="images/Pasted image 20250918152950.png" alt="PyWhisker attempt">
+      <h4>Hashcat cracking</h4>
+      <p>
+        The NTLMv2 hash captured from <code>p.agila</code> was cracked using <code>hashcat</code>. 
+        Hashcat correctly autodetected the mode as <code>5600</code> (NTLMv2).
+      </p>
+      <pre><code>hashcat hash /usr/share/wordlists/rockyou.txt</code></pre>
+      <p>
+        The password was successfully cracked to: <code>prometheusx-303</code>.
+      </p>
 
-<h4>Targeted Kerberoast</h4>
-<pre><code>python3 targetedKerberoast.py -v -d 'fluffy.htb' -u 'p.agila' -p 'prometheusx-303' --request-user 'winrm_svc'</code></pre>
-<img src="images/Pasted image 20250918153538.png" alt="Kerberoast successful">
+      <figure>
+        <img src="images/Pasted image 20250918145857.png" alt="Hashcat cracking output screenshot" />
+        <figcaption>Hashcat successfully cracking the captured NTLMv2 hash.</figcaption>
+      </figure>
 
-<p>WinRM_svc TGS captured. Attempted hashcat → failed. Using CVE exploits next.</p>
+      <h4>Testing recovered credentials</h4>
+      <p>
+        After obtaining credentials (and verifying them against SMB/other services), I used them to
+        explore access to additional resources. One important observation: some valid domain accounts
+        may not have remote WinRM access enabled — account permissions and service configuration can
+        limit where a credential is accepted.
+      </p>
 
-<h3>Certipy / Shadow Credentials</h3>
-<img src="images/Pasted image 20250919163022.png" alt="Certipy vulnerable check">
-<img src="images/Pasted image 20250919170216.png" alt="Got NT hash for ca_svc">
-<img src="images/Pasted image 20250919170628.png" alt="Got NT hash & TGT for winrm_svc">
+      <figure>
+        <img src="images/Pasted image 20250918150302.png" alt="WinRM access test failure screenshot" />
+        <figcaption>Login attempt indicating WinRM is not available for that user.</figcaption>
+      </figure>
 
-<h3>Evil-WinRM</h3>
-<pre><code>evil-winrm -i 10.10.11.69 -H 33bd09dcd697600edf6b3a7af4875767 -u winrm_svc</code></pre>
-<img src="images/Pasted image 20250919171535.png" alt="Logged in winrm_svc">
-<img src="images/Pasted image 20250919171939.png" alt="User flag">
+      <h4>Service account handling and group membership</h4>
+      <p>
+        Using the credentials I had, I explored group memberships and attempted to identify ways to
+        make a target user a member of a group associated with the services I intended to use. The bloodhound
+        data discovered earlier suggests that I may be able to perform a shadow credentials attack.
+      </p>
 
-<h3>Privilege Escalation</h3>
-<pre><code>whoami /all</code></pre>
-<img src="images/Pasted image 20250919172050.png" alt="Whoami all tokens">
-<img src="images/Pasted image 20250919172319.png" alt="Interesting users">
-<img src="images/Pasted image 20250919172606.png" alt="Uploaded winpeas.exe">
-<img src="images/Pasted image 20250919182520.png" alt="Run winpeas output">
+      <figure>
+        <img src="images/add-p-to-group-fluffy.png" alt="Add user to Service Accounts screenshot" />
+        <figcaption>Adding p.agila to the Service Accounts group using RPC.</figcaption>
+      </figure>
 
-<h3>Certify / Vulnerable Certificates</h3>
-<img src="images/Pasted image 20250919183154.png" alt="Certify vulnerable check">
-<img src="images/Pasted image 20250919183233.png" alt="Certify re-run">
-<img src="images/Pasted image 20250919183903.png" alt="Cert Publishers group & CA_SVC">
-<img src="images/Pasted image 20250919184321.png" alt="Templates & CA_SVC hash">
+      <h4>Kerberoasting and targeted TGS requests</h4>
+      <p>
+        I also attempted targeted Kerberoast-style requests to obtain service ticket material for
+        accounts such as <code>winrm_svc</code>. Capturing service tickets/TGS can be used offline to
+        attempt to recover service account credentials. In this engagement a TGS was captured but
+        cracking was unsuccessful with the provided wordlists — Kerberoast results are highly
+        dependent on password complexity and available cracking resources.
+      </p>
 
-<h3>Whisker / Rubeus / TGT</h3>
-<img src="images/Pasted image 20250920141209.png" alt="Whisker ca_svc creds">
-<img src="images/Pasted image 20250920141440.png" alt="Rubeus TGT">
-<img src="images/Pasted image 20250920142256.png" alt="Process TGT base64">
-<img src="images/Pasted image 20250920142419.png" alt="Convert to .ccache">
-<img src="images/Pasted image 20250920153159.png" alt="Re-enumerate CA">
-<img src="images/Pasted image 20250920153405.png" alt="ESC16 vulnerable">
-<img src="images/Pasted image 20250920154116.png" alt="Initial UPN of victim">
-<img src="images/Pasted image 20250920154512.png" alt="Administrator UPN check">
-<img src="images/Pasted image 20250920154640.png" alt="Update UPN to administrator">
-<img src="images/Pasted image 20250920155111.png" alt="Request certificate via ESC16">
-<img src="images/Pasted image 20250920162735.png" alt="Revert victim UPN">
-<img src="images/Pasted image 20250920160312.png" alt="Authenticate as administrator.pfx">
-<img src="images/Pasted image 20250920162815.png" alt="Administrator hash obtained">
-<img src="images/Pasted image 20250920163004.png" alt="NXC login administrator">
-<img src="images/Pasted image 20250920163207.png" alt="Impacket psexec root">
-<img src="images/Pasted image 20250920163436.png" alt="Sharphound run">
-<img src="images/Pasted image 20250920163529.png" alt="Ca_SVC GenericAll over RootCA">
+      <figure>
+        <img src="images/kerberoating-winrm-hash-fluffy.png" alt="Kerberoast result screenshot" />
+        <figcaption>Captured service ticket (TGS) for further offline analysis.</figcaption>
+      </figure>
 
-<h2>Remediation Recommendations</h2>
-<ul>
-    <li>Enforce strong, unique passwords for all service accounts.</li>
-    <li>Limit LDAP/WinRM write permissions to strictly necessary users.</li>
-    <li>Monitor CA certificate requests and log anomalous enrollments.</li>
-    <li>Implement Kerberos ticket auditing to detect abnormal TGT requests.</li>
-    <li>Regularly rotate service account credentials and revoke unused accounts.</li>
-    <li>Apply principle of least privilege to administrative groups.</li>
-</ul>
+      <h3>Shadow Credentials Attack</h3>
+      <p>
+        User certipy-ad to perform a shadow credentials attack for the winrm_svc user. 
+        <code>certipy-ad shadow auto -u p.agila@fluffy.htb -p 'prometheusx-303' -account ca_svc</code>
+        This attack is successful and I receive the NT hash for winrm_svc.
+      </p>
 
-</div>
+      <figure>
+        <img src="images/shadow-cred-attack-winrm-svc.png" alt="Certipy vulnerable check screenshot" />
+        <figcaption>Captured NT hash for winrm_svc</figcaption>
+      </figure>
+
+      <h3>Interactive shell as service account</h3>
+      <pre><code>evil-winrm -i 10.10.11.69 -H &lt;winrm_svc-hash&gt; -u winrm_svc</code></pre>
+      <figure>
+        <img src="images/initial-access-fluffy.png" alt="Evil-WinRM session screenshot" />
+        <figcaption>Interactive session obtained using service account credentials.</figcaption>
+      </figure>
+
+      <h3>Privilege Escalation — observations</h3>
+      <p>
+        Once an interactive shell was obtained for <code>winrm_svc</code>, I enumerated local
+        privileges, processes, and interesting files. WinPEAS and similar enumeration tools surfaced
+        a number of findings including group memberships, service-related ACLs, and artifacts
+        indicating CA-related permissions for <code>ca_svc</code> I also ran SharpHound.exe and used 
+        BloodHound to determine privilege escalation. 
+      </p>
+
+
+      <h3>Certificate abuse and ESC16-style path (conceptual)</h3>
+      <p>
+        The CA in this environment allowed a sequence of actions where a service account with specific
+        template rights could request a certificate for another account, and by adjusting attributes
+        such as the certificate subject or UPN temporarily, authenticate as that user. In this
+        engagement, leveraging CA template permissions and captured credential material enabled
+        authentication as the domain Administrator.
+      </p>
+
+      <figure>
+        <img src="images/Pasted image 20250920155111.png" alt="Certificate request screenshot" />
+        <figcaption>Certificate request and resulting authentication artifacts used to obtain Administrator access.</figcaption>
+      </figure>
+
+      <p>
+        After successfully authenticating as Administrator, I validated access and captured the
+        Administrator hash and session evidence. The remainder of the writeup documents verification
+        steps and re-enumeration to record what administrative-level privileges allowed.
+      </p>
+
+      <figure>
+        <img src="images/Pasted image 20250920162815.png" alt="Administrator hash obtained screenshot" />
+        <figcaption>Administrator-level credential material captured during the lab exercise.</figcaption>
+      </figure>
+
+      <h2>Remediation Recommendations</h2>
+      <p>
+        The findings in this assessment are common patterns that lead to privilege escalation in
+        Windows/AD environments. Below are prioritized recommendations to reduce attack surface and
+        mitigate the classes of abuse observed:
+      </p>
+      <ul>
+        <li><strong>Enforce strong, unique passwords</strong> for all service accounts and enable
+            credential monitoring and rotation. Service account passwords should be managed and
+            rotated by a privileged credential store.</li>
+        <li><strong>Restrict LDAP/WinRM write permissions</strong> — limit which users can modify
+            service-related objects, group membership, and servicePrincipalName attributes. Review
+            changes via logging and alerts.</li>
+        <li><strong>Harden Certificate Services</strong> — review template permissions, restrict who
+            can enroll and which attributes can be modified during enrollment. Enforce approval
+            workflows for high-risk templates.</li>
+        <li><strong>Monitor authentication and certificate events</strong> — alert on abnormal
+            certificate requests, unexpected subject/UPN changes, or unusual high-volume TGS/TGT
+            requests.</li>
+        <li><strong>Implement Kerberos and NTLM auditing</strong> — collect and analyze TGS/TGT and
+            NTLM authentication events to detect suspicious patterns.</li>
+        <li><strong>Apply least privilege</strong> to all service and administrative groups and
+            remove unused service accounts. Regularly review group membership and ACLs.</li>
+        <li><strong>Protect sensitive shares</strong> — remove unencrypted password stores from
+            network shares, enforce access controls, and use DLP to detect exposed credentials.</li>
+      </ul>
+
+      <p>
+        These mitigations reduce the likelihood that an initial compromise or misconfiguration can be
+        escalated into full domain compromise. Many of the issues observed were the result of overly
+        permissive ACLs combined with opportunistic file placements on shared resources.
+      </p>
+    </article>
+  </main>
 
   <!-- Footer -->
   <footer>
-    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc">GitHub</a></p>
+    <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener noreferrer">GitHub</a></p>
     <p><a href="/../index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
   </footer>
 
