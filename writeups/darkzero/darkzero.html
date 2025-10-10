@@ -88,6 +88,7 @@
         <div class="code-block"><pre>rpcclient -U "john.w" 10.10.11.89</pre></div>
         <img class="screenshot" src="../images/Pasted image 20251008103439.png" alt="rpcclient user lookup">
         <p>Looked up <code>john.w</code> SID and confirmed user presence. RID brute-forcing revealed the <code>darkzero-ext$</code> machine account, validating a forest trust to <code>darkzero.ext</code>.</p>
+        <p><code>nxc smb dc01.darkzero.htb -k -u 'john.w' -p 'RFulUtONCOL!' --rid-brute</code></p>
         <img class="screenshot" src="../images/Pasted image 20251008114149.png" alt="RID brute results darkzero-ext$">
       </section>
 
